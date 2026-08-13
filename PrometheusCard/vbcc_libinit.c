@@ -31,7 +31,7 @@ LONG LibReserved (void);
 struct CardBase *LibInit (__REGD0(struct CardBase* cb), __REGA0(APTR seglist), __REGA6(struct Library *sysb));
 
 #define VERSION  7
-#define REVISION 601
+#define REVISION 602
 
 int main(void)
 {
@@ -68,7 +68,7 @@ void kprintf(STRPTR format, ...)
 #endif
 
 
-char libid[]   = "\0$VER: Prometheus.card 7.601 " __DBG__ "(10.05.2023)\r\n";
+char libid[]   = "\0$VER: Prometheus.card 7.602 " __DBG__ "(12.08.2026)\r\n";
 char libname[] = "Prometheus.card\0";
 
 char build[]   = "build date: " __DATE__ ", " __TIME__ "\n";
@@ -191,6 +191,7 @@ static void free_resources(struct CardBase *cb)
   {
     struct Library* SysBase = cb->cb_SysBase;
 
+    FreeDMAMemoryArena(cb);
     if (cb->cb_MemSem)
       {
         APTR sm = cb->cb_MemSem;
@@ -229,8 +230,11 @@ struct CardBase *LibInit (__REGD0(struct CardBase* cb), __REGA0(APTR seglist), _
     cb->cb_SegList        = seglist;
     cb->cb_Name           = &libname[0];
     cb->cb_PrometheusBase = NULL;
+    cb->cb_LegacyIOBase   = NULL;
     cb->cb_DMAMemGranted  = FALSE;
     cb->cb_MemPool        = NULL;
+    cb->cb_MemSem         = NULL;
+    cb->cb_DMAArena       = NULL;
 
     return cb;
   }
@@ -262,7 +266,7 @@ struct CardBase *LibOpen (__REGA6(struct CardBase *cb))
 /* CLOSE                                                                   */
 /*-------------------------------------------------------------------------*/
 
-long LibClose (__REGA6(struct CardBase *cb))
+LONG LibClose (__REGA6(struct CardBase *cb))
  {
   if (!(--cb->cb_Library.lib_OpenCnt))
    {
@@ -297,8 +301,7 @@ void *LibExpunge (__REGA6(struct CardBase *cb))
 /* RESERVED                                                                */
 /*-------------------------------------------------------------------------*/
 
-long LibReserved (void)
+LONG LibReserved (void)
  {
   return 0;
  }
-

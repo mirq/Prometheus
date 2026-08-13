@@ -1,6 +1,6 @@
 #include <proto/exec.h>
 #include <proto/prometheus.h>
-#include <libraries/prometheus.h>
+#include <prometheus.h>
 #include <proto/picasso96_chip.h>
 
 #include "card.h"
@@ -110,4 +110,3 @@ BOOL Init3DLabsPermedia2(struct CardBase *cb, struct BoardInfo *bi)
       }
     return FALSE;
   }
-

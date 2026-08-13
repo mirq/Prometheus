@@ -1,0 +1,28 @@
+name: Prometheus.card CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: stefanreinauer/amiga-gcc:gcc-v6.5.0b-20251124@sha256:11b06254ed512d9a8f65fb13eeb723d5e33cacc1880b80df9f63c29e95fc879a
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Prometheus.card
+        run: make clean && make
+        env:
+          CROSS: m68k-amigaos-
+
+      - name: Upload Prometheus.card
+        uses: actions/upload-artifact@v4
+        with:
+          name: Prometheus.card
+          path: Prometheus.card
+          if-no-files-found: error

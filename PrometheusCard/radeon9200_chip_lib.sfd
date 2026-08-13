@@ -1,0 +1,10 @@
+==base _ChipBase
+==basetype struct Library*
+==libname Radeon9200.chip
+==bias 30
+==public
+==include "boardinfo.h"
+==version 1
+BOOL InitChip(struct BoardInfo *bi) (a0)
+BOOL InitRadeonFeatures(struct BoardInfo *bi, ULONG features) (a0,d0)
+==end
