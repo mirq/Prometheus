@@ -2,4 +2,5 @@
 ##bias 30
 ##public
 InitChip(bi)(a0)
+InitRadeonFeatures(bi,features)(a0,d0)
 ##end

@@ -27,13 +27,16 @@ $(OBJDIR)card_3dlabspermedia2.o : card_3dlabspermedia2.c
 $(OBJDIR)card_s3virge.o : card_s3virge.c
 	$(CC) $(shell vbccprefs) -c -o $(OBJDIR)card_s3virge.o card_s3virge.c
 
+$(OBJDIR)card_radeon9200.o : card_radeon9200.c
+	$(CC) $(shell vbccprefs) -c -o $(OBJDIR)card_radeon9200.o card_radeon9200.c
+
 $(OBJDIR)dma.o : dma.c
 	$(CC) $(shell vbccprefs) -c -o $(OBJDIR)dma.o dma.c
 
 $(OBJDIR)vbcc_libinit.o : vbcc_libinit.c
 	$(CC) $(shell vbccprefs) -c -o $(OBJDIR)vbcc_libinit.o vbcc_libinit.c
 
-OBJS = $(OBJDIR)vbcc_libinit.o $(OBJDIR)dma.o $(OBJDIR)card_s3virge.o $(OBJDIR)card_3dlabspermedia2.o $(OBJDIR)card_3dfxvoodoo.o\
+OBJS = $(OBJDIR)vbcc_libinit.o $(OBJDIR)dma.o $(OBJDIR)card_radeon9200.o $(OBJDIR)card_s3virge.o $(OBJDIR)card_3dlabspermedia2.o $(OBJDIR)card_3dfxvoodoo.o\
  $(OBJDIR)card.o
 
 $(EXE) : $(OBJS)

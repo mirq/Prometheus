@@ -10,7 +10,7 @@
 #endif
 
 #define InitChip(bi) \
-	LP1NR(0x1e, InitChip, struct BoardInfo *, bi, a0, \
+	LP1(0x1e, BOOL, InitChip, struct BoardInfo *, bi, a0, \
 	, CHIP_BASE_NAME)
 
 #endif /*  _INLINE_CHIP_H  */

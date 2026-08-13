@@ -49,4 +49,8 @@ APTR Prm_AllocDMABuffer(ULONG size);
 VOID Prm_FreeDMABuffer(APTR buffer, ULONG size);
 APTR Prm_GetPhysicalAddress(APTR addr);
 
+/*--- functions in V3 or higher ---*/
+
+APTR Prm_GetVirtualAddress(APTR addr);
+
 #endif	 /* CLIB_PROMETHEUS_PROTOS_H */

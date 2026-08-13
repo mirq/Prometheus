@@ -1,178 +1,195 @@
 #include <exec/libraries.h>
-#include <proto/exec.h>
-#include <proto/prometheus.h>
-#include <libraries/prometheus.h>
 #include <exec/memory.h>
+#include <proto/exec.h>
 
 #include "boardinfo.h"
 #include "card.h"
 
-#define ALIGNMENT 4096
-
-/* PrometheusBase private fields are only used to extract SysBase, */
-/* it is much faster than read it from $00000004.                  */
-
-struct PrometheusBase
-  {
-    struct Library    pb_Lib;
-    struct Library   *pb_SysBase;
-
-    /* private not used fields here */
-
-  };
-
+#define DMA_PAGE_SIZE         4096UL
+#define DMA_PAGE_MASK         (DMA_PAGE_SIZE - 1UL)
+#define DMA_PAGE_CONTINUATION 0xffffffffUL
 
 APTR AllocDMAMemory(__REGD0(ULONG size), __REGA6(struct CardBase *cb))
   {
-    struct Library* SysBase = cb->cb_SysBase;
-    ULONG bestsize = 0xFFFFFFFF;
-    struct DMAMemChunk *mem, *best = NULL;
-    APTR memaddr = NULL;
+    struct Library *SysBase = cb->cb_SysBase;
+    struct DMAMemArena *arena;
+    ULONG aligned;
+    ULONG requestedPages;
+    ULONG bestStart = 0;
+    ULONG bestLength = 0xffffffffUL;
+    ULONG index;
+    APTR result = NULL;
 
-    D(kprintf("prometheus.card: allocDMA(%ld)\n", size));
-
-    if (size == 0)
-      {
-        D(kprintf("prometheus.card: allocDMA() zero size!\n"));
-        return NULL;
-      }
-
-    size = (size + ALIGNMENT + 3) & ~3;
+    if (!size || size > ~0UL - DMA_PAGE_MASK)
+      return NULL;
 
     ObtainSemaphore(cb->cb_MemSem);
-
-    for (mem = (struct DMAMemChunk*)cb->cb_MemList.mlh_Head;
-     mem->dmc_Node.mln_Succ;
-     mem = (struct DMAMemChunk*)mem->dmc_Node.mln_Succ)
+    arena = cb->cb_DMAArena;
+    if (!arena)
+      goto done;
+    aligned = (size + DMA_PAGE_MASK) & ~DMA_PAGE_MASK;
+    requestedPages = aligned / DMA_PAGE_SIZE;
+    if (!requestedPages || requestedPages > arena->dma_PageCount)
+      goto done;
+    index = 0;
+    while (index < arena->dma_PageCount)
       {
-        if ((!mem->dmc_Owner) && (mem->dmc_Size >= size) && (mem->dmc_Size < bestsize))
+        ULONG start;
+        ULONG length;
+
+        if (arena->dma_Pages[index].dmp_RunLength)
           {
-            bestsize = mem->dmc_Size;
-            best = mem;
-            if (mem->dmc_Size == size) break;
+            ++index;
+            continue;
+          }
+        start = index;
+        while (index < arena->dma_PageCount &&
+               !arena->dma_Pages[index].dmp_RunLength)
+          ++index;
+        length = index - start;
+        if (length >= requestedPages && length < bestLength)
+          {
+            bestStart = start;
+            bestLength = length;
+            if (length == requestedPages)
+              break;
           }
       }
 
-    if (best)
+    if (bestLength != 0xffffffffUL)
       {
-        if (best->dmc_Size == size)
+        ULONG page;
+
+        arena->dma_Pages[bestStart].dmp_RunLength = requestedPages;
+        arena->dma_Pages[bestStart].dmp_RequestedSize = size;
+        for (page = 1; page < requestedPages; ++page)
           {
-            best->dmc_Owner = FindTask(NULL);
-            memaddr = best->dmc_Address;
+            arena->dma_Pages[bestStart + page].dmp_RunLength =
+              DMA_PAGE_CONTINUATION;
+            arena->dma_Pages[bestStart + page].dmp_RequestedSize = 0;
           }
-        else
-          {
-            if (mem = AllocPooled(cb->cb_MemPool, sizeof(struct DMAMemChunk)))
-              {
-                D(kprintf("prometheus.card: DMC allocated at $%08lx\n", (LONG)mem));
-                mem->dmc_Size = best->dmc_Size - size;
-                mem->dmc_Address = (APTR)((ULONG)best->dmc_Address + size);
-                mem->dmc_Owner = NULL;
-                best->dmc_Owner = FindTask(NULL);
-                best->dmc_Size = size;
-                Insert((struct List*)&cb->cb_MemList, (struct Node*)mem, (struct Node*)best);
-                memaddr = best->dmc_Address;
-              }
-          }
-       memaddr = (APTR)(((ULONG)memaddr + (ALIGNMENT - 1)) & (-ALIGNMENT));
-       best->dmc_AlignedAddr = memaddr;
+        result = (APTR)((ULONG)arena->dma_Base +
+                        bestStart * DMA_PAGE_SIZE);
       }
+done:
     ReleaseSemaphore(cb->cb_MemSem);
-    D(kprintf("prometheus.card: Allocated DMA at $%08lx with size %ld\n", (LONG)memaddr, size));
-    return memaddr;
+    return result;
   }
 
-
-void FreeDMAMemory(__REGA0(APTR membase), __REGD0(ULONG memsize), __REGA6(struct CardBase *cb))
+void FreeDMAMemory(__REGA0(APTR memory), __REGD0(ULONG size),
+                   __REGA6(struct CardBase *cb))
   {
-    struct Library* SysBase = cb->cb_SysBase;
-    struct DMAMemChunk *mem, *tmem;
+    struct Library *SysBase = cb->cb_SysBase;
+    struct DMAMemArena *arena;
+    ULONG base;
+    ULONG address;
+    ULONG offset;
+    ULONG index;
+    ULONG runLength;
+    ULONG suppliedPages;
+    ULONG page;
 
-    D(kprintf("prometheus.card: freeDMA($%08lx, %ld)\n", (LONG)membase, memsize));
-    if (memsize == 0)
-      {
-        D(kprintf("prometheus.card: freeDMA() zero size!\n"));
-        return;
-      }
-
-    if (!membase)
-      {
-        D(kprintf("prometheus.card: freeDMA() NULL pointer!\n"));
-        return;
-      }
+    if (!memory || !size || size > ~0UL - 3UL)
+      return;
 
     ObtainSemaphore(cb->cb_MemSem);
-
-    for (mem = (struct DMAMemChunk*)cb->cb_MemList.mlh_Head;
-     mem->dmc_Node.mln_Succ;
-     mem = (struct DMAMemChunk*)mem->dmc_Node.mln_Succ)
+    arena = cb->cb_DMAArena;
+    if (!arena)
+      goto done;
+    base = (ULONG)arena->dma_Base;
+    address = (ULONG)memory;
+    if (address < base)
+      goto done;
+    offset = address - base;
+    if (offset >= arena->dma_Size || (offset & DMA_PAGE_MASK))
+      goto done;
+    index = offset / DMA_PAGE_SIZE;
+    runLength = arena->dma_Pages[index].dmp_RunLength;
+    suppliedPages = (size + DMA_PAGE_MASK) / DMA_PAGE_SIZE;
+    if (!runLength || runLength == DMA_PAGE_CONTINUATION ||
+        (!arena->dma_LegacyFree && suppliedPages != runLength) ||
+        runLength > arena->dma_PageCount - index)
       {
-        if(mem->dmc_AlignedAddr == membase) break;
+        D(kprintf("prometheus.card: invalid DMA free $%08lx size %ld\n",
+                  (LONG)memory, size));
+        goto done;
       }
-
-    if (!mem->dmc_Node.mln_Succ)
+    for (page = 1; page < runLength; ++page)
+      if (arena->dma_Pages[index + page].dmp_RunLength !=
+          DMA_PAGE_CONTINUATION)
+        goto done;
+    for (page = 0; page < runLength; ++page)
       {
-        D(kprintf("prometheus.card: freeDMA() block not found!\n"));
-        return;
+        arena->dma_Pages[index + page].dmp_RunLength = 0;
+        arena->dma_Pages[index + page].dmp_RequestedSize = 0;
       }
-
-    if (!mem->dmc_Owner)
-      {
-        D(kprintf("prometheus.card: freeDMA() freed twice!\n"));
-        return;
-      }
-
-    mem->dmc_Owner = NULL;
-
-    /* merge with predecessor */
-
-    tmem = (struct DMAMemChunk*)mem->dmc_Node.mln_Pred;
-    if ((tmem->dmc_Node.mln_Pred) && (!tmem->dmc_Owner))
-      {
-        mem->dmc_Address = tmem->dmc_Address;
-        mem->dmc_Size += tmem->dmc_Size;
-        Remove((struct Node*)tmem);
-        D(kprintf("prometheus.card: DMC at $%08lx will be freed\n", (LONG)tmem));
-        FreePooled(cb->cb_MemPool, tmem, sizeof(struct DMAMemChunk));
-      }
-
-    /* merge with successor */
-
-    tmem = (struct DMAMemChunk*)mem->dmc_Node.mln_Succ;
-    if ((tmem->dmc_Node.mln_Succ) && (!tmem->dmc_Owner))
-      {
-        mem->dmc_Size += tmem->dmc_Size;
-        Remove((struct Node*)tmem);
-        D(kprintf("prometheus.card: DMC at $%08lx will be freed\n", (LONG)tmem));
-        FreePooled(cb->cb_MemPool, tmem, sizeof(struct DMAMemChunk));
-      }
-
+done:
     ReleaseSemaphore(cb->cb_MemSem);
-    return;
   }
 
-
-VOID InitDMAMemory(struct CardBase *cb, APTR memory, ULONG size)
+BOOL InitDMAMemory(struct CardBase *cb, APTR memory, ULONG size,
+                   BOOL legacyFree)
   {
-    struct Library* SysBase = cb->cb_SysBase;
-    struct Library* PrometheusBase = cb->cb_PrometheusBase;
-    struct DMAMemChunk *dmc;
+    struct Library *SysBase = cb->cb_SysBase;
+    struct DMAMemArena *arena;
+    ULONG pages;
+    ULONG extra;
+    ULONG allocationSize;
 
-    if ((size > 0) && (memory != NULL))
+    ULONG start;
+    ULONG end;
+
+    if (cb->cb_DMAArena || !memory || !size ||
+        size > ~0UL - (ULONG)memory ||
+        (ULONG)memory > ~0UL - DMA_PAGE_MASK)
+      return FALSE;
+    start = ((ULONG)memory + DMA_PAGE_MASK) & ~DMA_PAGE_MASK;
+    end = ((ULONG)memory + size) & ~DMA_PAGE_MASK;
+    pages = end > start ? (end - start) / DMA_PAGE_SIZE : 0;
+    if (!pages)
       {
-        ObtainSemaphore(cb->cb_MemSem);
+        arena = AllocMem(sizeof(*arena), MEMF_PUBLIC | MEMF_CLEAR);
+        if (!arena)
+          return FALSE;
+        arena->dma_Base = (APTR)start;
+        arena->dma_Size = 0;
+        arena->dma_PageCount = 0;
+        arena->dma_AllocationSize = sizeof(*arena);
+        arena->dma_LegacyFree = legacyFree;
+        cb->cb_DMAArena = arena;
+        return TRUE;
+      }
+    extra = pages - 1UL;
+    if (extra > (~0UL - sizeof(*arena)) / sizeof(struct DMAMemPage))
+      return FALSE;
+    allocationSize = sizeof(*arena) + extra * sizeof(struct DMAMemPage);
+    arena = AllocMem(allocationSize, MEMF_PUBLIC | MEMF_CLEAR);
+    if (!arena)
+      return FALSE;
+    arena->dma_Base = (APTR)start;
+    arena->dma_Size = end - start;
+    arena->dma_PageCount = pages;
+    arena->dma_AllocationSize = allocationSize;
+    arena->dma_LegacyFree = legacyFree;
+    cb->cb_DMAArena = arena;
+    return TRUE;
+  }
 
-        cb->cb_MemList.mlh_Head = (struct MinNode*)&cb->cb_MemList.mlh_Tail;
-        cb->cb_MemList.mlh_Tail = NULL;
-        cb->cb_MemList.mlh_TailPred = (struct MinNode*)&cb->cb_MemList.mlh_Head;
+VOID FreeDMAMemoryArena(struct CardBase *cb)
+  {
+    struct Library *SysBase = cb->cb_SysBase;
+    struct DMAMemArena *arena;
 
-        if (dmc = AllocPooled(cb->cb_MemPool, sizeof(struct DMAMemChunk)))
-          {
-            dmc->dmc_Size = size;
-            dmc->dmc_Address = memory;
-            dmc->dmc_Owner = NULL;
-            AddHead((struct List*)&cb->cb_MemList, (struct Node*)dmc);
-          }
+    if (!cb->cb_MemSem)
+      return;
+    ObtainSemaphore(cb->cb_MemSem);
+    arena = cb->cb_DMAArena;
+    if (!arena)
+      {
         ReleaseSemaphore(cb->cb_MemSem);
+        return;
       }
+    cb->cb_DMAArena = NULL;
+    ReleaseSemaphore(cb->cb_MemSem);
+    FreeMem(arena, arena->dma_AllocationSize);
   }

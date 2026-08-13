@@ -19,15 +19,20 @@ void kprintf(STRPTR format, ...);
 #define D(x)
 #endif
 
-/* DMAMemChunk structure describes single DMA memory chunk. */
-
-struct DMAMemChunk
+struct DMAMemPage
   {
-    struct MinNode  dmc_Node;         /* for linking into list */
-    APTR            dmc_Address;      /* logical (CPU) address */
-    struct Task    *dmc_Owner;        /* memory owner (NULL if none) */
-    ULONG           dmc_Size;         /* chunk size in bytes */
-    APTR            dmc_AlignedAddr;  /* Aligned on 4K address */
+    ULONG dmp_RunLength;
+    ULONG dmp_RequestedSize;
+  };
+
+struct DMAMemArena
+  {
+    APTR             dma_Base;
+    ULONG            dma_Size;
+    ULONG            dma_PageCount;
+    ULONG            dma_AllocationSize;
+    BOOL             dma_LegacyFree;
+    struct DMAMemPage dma_Pages[1];
   };
 
 struct CardBase
@@ -43,11 +48,10 @@ struct CardBase
     /* standard fields ends here */
 
     struct Library         *cb_PrometheusBase;
-    BOOL                    cb_DMAMemGranted;
+    BOOL                    cb_DMAMemGranted; /* retained for private layout compatibility */
     APTR                    cb_LegacyIOBase;
-    APTR                    cb_MemPool;         /* for DMA memory management lists */
-    struct MinList          cb_MemList;
-//    struct DMAMemChunk      cb_MemRoot;
+    APTR                    cb_MemPool;
+    struct DMAMemArena     *cb_DMAArena;
     struct SignalSemaphore *cb_MemSem;
   };
 
@@ -55,7 +59,13 @@ BOOL Init3dfxVoodoo(struct CardBase *cb, struct BoardInfo *bi);      // check Ba
 BOOL Init3DLabsPermedia2(struct CardBase *cb, struct BoardInfo *bi); // check Permedia2 based cards (3DLabs/TI)
 BOOL InitCirrusGD5446(struct BoardInfo *bi);    // check GD5446 based Cirrus cards
 BOOL InitS3ViRGE(struct CardBase *cb, struct BoardInfo *bi);         // check ViRGE based S3 cards
-VOID InitDMAMemory(struct CardBase *cb, APTR memory, ULONG size);
+BOOL InitRadeon9200(struct CardBase *cb, struct BoardInfo *bi);
+BOOL InitRadeon9200Features(struct BoardInfo *bi, ULONG features);
+void CompleteRadeon9200(struct CardBase *cb, struct BoardInfo *bi);
+void AbortRadeon9200(struct BoardInfo *bi);
+BOOL InitDMAMemory(struct CardBase *cb, APTR memory, ULONG size,
+                   BOOL legacyFree);
+VOID FreeDMAMemoryArena(struct CardBase *cb);
 
 void RegisterIntServer(struct CardBase *cb, void *board, struct Interrupt *interrupt);
 void RegisterOwner(struct CardBase *cb, void *board, struct Node *driver);

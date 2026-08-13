@@ -3,7 +3,7 @@
 #include <proto/utility.h>
 #include <proto/expansion.h>
 #include <proto/prometheus.h>
-#include <libraries/prometheus.h>
+#include <prometheus.h>
 #include <exec/execbase.h>
 #include <hardware/intbits.h>
 
@@ -11,6 +11,54 @@
 #include "card.h"
 
 #define HAS_TOOLTYPES (bi->GetVSyncState != NULL)
+#define DMA_PAGE_SIZE 4096UL
+#define DMA_PAGE_MASK (DMA_PAGE_SIZE - 1UL)
+#define MIN_DISPLAY_MEMORY 0x00400000UL
+
+static BOOL ParseDMASize(char *text, ULONG *result)
+  {
+    ULONG value = 0;
+    ULONG multiplier = 1;
+    BOOL digit = FALSE;
+
+    while (*text >= '0' && *text <= '9')
+      {
+        ULONG next = (ULONG)(*text - '0');
+        digit = TRUE;
+        if (value > (~0UL - next) / 10UL) return FALSE;
+        value = value * 10UL + next;
+        ++text;
+      }
+    if (!digit) return FALSE;
+    if (*text)
+      {
+        if ((text[0] == 'k' || text[0] == 'K') && !text[1])
+          multiplier = 1024UL;
+        else if ((text[0] == 'm' || text[0] == 'M') && !text[1])
+          multiplier = 1024UL * 1024UL;
+        else return FALSE;
+      }
+    if (value > ~0UL / multiplier) return FALSE;
+    *result = value * multiplier;
+    return TRUE;
+  }
+
+static ULONG ParseLegacyDMASize(char *text)
+  {
+    ULONG value = 0;
+    UBYTE character;
+
+    while ((character = *text++) != 0)
+      {
+        if (character >= '0' && character <= '9')
+          value = value * 10UL + (ULONG)(character - '0');
+        else if (character == 'k' || character == 'K')
+          value <<= 10;
+        else if (character == 'm' || character == 'M')
+          value <<= 20;
+      }
+    return value;
+  }
 
 // we have that one in the BoardInfo structure
 // so there's no need to open it again.
@@ -182,7 +230,14 @@ BOOL InitCard(__REGA0(struct BoardInfo *bi), __REGA1(char **ToolTypes), __REGA6(
     BOOL found = FALSE;
     BOOL forbid_interrupts = FALSE;
     BOOL special_switch = FALSE;
+    BOOL dma_valid = FALSE;
+    BOOL cp_enabled = FALSE;
+    BOOL hw_sprite = TRUE;
+    BOOL hw_text = TRUE;
+    BOOL text_stage = FALSE;
+    BOOL radeon = FALSE;
     ULONG dma_size = 0;
+    ULONG legacy_dma_size = 0;
     struct Library* UtilityBase = bi->UtilBase;
 
     /* add dummy handler for safety reasons... */
@@ -195,7 +250,7 @@ BOOL InitCard(__REGA0(struct BoardInfo *bi), __REGA1(char **ToolTypes), __REGA6(
 
         char *ToolType;
 
-        while (ToolType = *ToolTypes++)
+        while (ToolTypes && (ToolType = *ToolTypes++))
           {
             /* check if JAVOSOFT is specified as switch type */
             /* this is only important if just one monitor is used */
@@ -219,32 +274,14 @@ BOOL InitCard(__REGA0(struct BoardInfo *bi), __REGA1(char **ToolTypes), __REGA6(
 
             if (Strnicmp(ToolType, "DMASIZE=", 8) == 0)
               {
-                if (!cb->cb_DMAMemGranted)
-                  {
-                    STRPTR cp = &ToolType[8];
-                    UBYTE c;
-                    ULONG size = 0;
-
-                    while ((c = *cp++) != 0)
-                      {
-                        if ((c >= '0') && (c <= '9'))
-                          {
-                            size = size*10 + (c - '0');
-                          }
-                        else
-                          {
-                            if ((c == 'k') || (c == 'K')) size = size << 10;
-                            else if((c == 'm') || (c == 'M')) size = size << 20;
-                          }
-                      }
-
-                    if (size > 0)
-                      {
-                        dma_size = size;
-                        bi->Flags |= BIF_GRANTDIRECTACCESS;
-                      }
-                  }
+                dma_valid = ParseDMASize(&ToolType[8], &dma_size);
+                if (!dma_valid) dma_size = 0;
+                legacy_dma_size = ParseLegacyDMASize(&ToolType[8]);
               }
+            else if (Stricmp(ToolType, "CP=YES") == 0) cp_enabled = TRUE;
+            else if (Stricmp(ToolType, "HWSPRITE=NO") == 0) hw_sprite = FALSE;
+            else if (Stricmp(ToolType, "HWTEXT=NO") == 0) hw_text = FALSE;
+            else if (Stricmp(ToolType, "TEXTSTAGE=YES") == 0) text_stage = TRUE;
           }
       }
 
@@ -259,6 +296,12 @@ BOOL InitCard(__REGA0(struct BoardInfo *bi), __REGA1(char **ToolTypes), __REGA6(
   /* check Permedia2 based cards (3DLabs/TI) */
 
   if(!found) found = Init3DLabsPermedia2(cb, bi);
+
+  if (!found)
+    {
+      found = InitRadeon9200(cb, bi);
+      radeon = found;
+    }
 
   if (found)
     {
@@ -296,16 +339,55 @@ BOOL InitCard(__REGA0(struct BoardInfo *bi), __REGA1(char **ToolTypes), __REGA6(
           
           bi->Flags = bi->Flags & ~(ULONG)BIF_VBLANKINTERRUPT;
         }
-      if (PrometheusBase->lib_Version >= 2)
+      if (!radeon && legacy_dma_size)
+        bi->Flags |= BIF_GRANTDIRECTACCESS;
+      if (radeon)
         {
-          if ((dma_size > 0) && (dma_size <= bi->MemorySize))
+          BOOL dma_ready = FALSE;
+
+          if (PrometheusBase->lib_Version >= 2 && !cb->cb_DMAArena &&
+              dma_valid && dma_size && dma_size <= ~0UL - DMA_PAGE_MASK)
             {
-              cb->cb_DMAMemGranted = TRUE;
-              bi->MemorySize = bi->MemorySize - dma_size;
-              InitDMAMemory(cb, (APTR)((ULONG)bi->MemoryBase + bi->MemorySize), dma_size);
+              ULONG reserved = (dma_size + DMA_PAGE_MASK) & ~DMA_PAGE_MASK;
+              if (bi->MemorySize >= MIN_DISPLAY_MEMORY &&
+                  reserved <= bi->MemorySize - MIN_DISPLAY_MEMORY &&
+                  InitDMAMemory(cb,
+                    (APTR)((ULONG)bi->MemoryBase + bi->MemorySize - reserved),
+                    reserved, FALSE))
+                {
+                  bi->MemorySize -= reserved;
+                  dma_ready = TRUE;
+                }
             }
+          if (!dma_ready)
+            {
+              AbortRadeon9200(bi);
+              return FALSE;
+            }
+        }
+      else if (PrometheusBase->lib_Version >= 2 && !cb->cb_DMAArena)
+        {
+          if (legacy_dma_size <= bi->MemorySize &&
+              InitDMAMemory(cb,
+                (APTR)((ULONG)bi->MemoryBase + bi->MemorySize -
+                       legacy_dma_size), legacy_dma_size, TRUE))
+            bi->MemorySize -= legacy_dma_size;
+        }
+      if (radeon)
+        {
+          ULONG features = 0;
+          if (cp_enabled) features |= 1UL << 0;
+          if (hw_sprite) features |= 1UL << 1;
+          if (hw_text) features |= 1UL << 2;
+          if (text_stage) features |= 1UL << 3;
+          if (!InitRadeon9200Features(bi, features))
+            {
+              FreeDMAMemoryArena(cb);
+              AbortRadeon9200(bi);
+              return FALSE;
+            }
+          CompleteRadeon9200(cb, bi);
         }
     }
     return found;
   }
-

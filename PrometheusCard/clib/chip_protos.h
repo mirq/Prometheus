@@ -12,6 +12,6 @@
 #include "boardinfo.h"
 #endif
 
-void	InitChip(struct BoardInfo *bi);
+BOOL	InitChip(struct BoardInfo *bi);
 
 #endif	 /* CLIB_PICASSO96_CHIP_PROTOS_H */
