@@ -9,6 +9,7 @@
 #define DEVICE_PROMETHEUS     1
 #define BOARD_NAME          "Prometheus"
 #define BOARD_TYPE          BT_Prometheus
+#define EARLY_DMA_SIZE      (2UL * 1024UL * 1024UL)
 
 #define LIB(a) struct Library *##a = cb->cb_##a
 
@@ -53,6 +54,8 @@ struct CardBase
     APTR                    cb_MemPool;
     struct DMAMemArena     *cb_DMAArena;
     struct SignalSemaphore *cb_MemSem;
+    BOOL                    cb_DMAEarly;
+    BOOL                    cb_DMAEarlyAttempted;
   };
 
 BOOL Init3dfxVoodoo(struct CardBase *cb, struct BoardInfo *bi);      // check Banshee/Voodoo3/4/5 based cards
@@ -65,6 +68,7 @@ void CompleteRadeon9200(struct CardBase *cb, struct BoardInfo *bi);
 void AbortRadeon9200(struct BoardInfo *bi);
 BOOL InitDMAMemory(struct CardBase *cb, APTR memory, ULONG size,
                    BOOL legacyFree);
+BOOL InitEarlyRadeonDMAMemory(struct CardBase *cb);
 VOID FreeDMAMemoryArena(struct CardBase *cb);
 
 void RegisterIntServer(struct CardBase *cb, void *board, struct Interrupt *interrupt);

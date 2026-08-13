@@ -345,8 +345,20 @@ BOOL InitCard(__REGA0(struct BoardInfo *bi), __REGA1(char **ToolTypes), __REGA6(
         {
           BOOL dma_ready = FALSE;
 
-          if (PrometheusBase->lib_Version >= 2 && !cb->cb_DMAArena &&
-              dma_valid && dma_size && dma_size <= ~0UL - DMA_PAGE_MASK)
+          if (PrometheusBase->lib_Version >= 2 && cb->cb_DMAArena &&
+              cb->cb_DMAEarly && dma_valid &&
+              dma_size == cb->cb_DMAArena->dma_Size &&
+              bi->MemorySize >= dma_size &&
+              (ULONG)cb->cb_DMAArena->dma_Base ==
+                (ULONG)bi->MemoryBase + bi->MemorySize - dma_size)
+            {
+              bi->MemorySize -= dma_size;
+              cb->cb_DMAEarly = FALSE;
+              dma_ready = TRUE;
+            }
+          else if (PrometheusBase->lib_Version >= 2 && !cb->cb_DMAArena &&
+                   dma_valid && dma_size &&
+                   dma_size <= ~0UL - DMA_PAGE_MASK)
             {
               ULONG reserved = (dma_size + DMA_PAGE_MASK) & ~DMA_PAGE_MASK;
               if (bi->MemorySize >= MIN_DISPLAY_MEMORY &&

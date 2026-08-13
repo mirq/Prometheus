@@ -235,6 +235,8 @@ struct CardBase *LibInit (__REGD0(struct CardBase* cb), __REGA0(APTR seglist), _
     cb->cb_MemPool        = NULL;
     cb->cb_MemSem         = NULL;
     cb->cb_DMAArena       = NULL;
+    cb->cb_DMAEarly       = FALSE;
+    cb->cb_DMAEarlyAttempted = FALSE;
 
     return cb;
   }

@@ -1,6 +1,8 @@
 #include <exec/libraries.h>
 #include <exec/memory.h>
 #include <proto/exec.h>
+#include <prometheus.h>
+#include <proto/prometheus.h>
 
 #include "boardinfo.h"
 #include "card.h"
@@ -8,6 +10,93 @@
 #define DMA_PAGE_SIZE         4096UL
 #define DMA_PAGE_MASK         (DMA_PAGE_SIZE - 1UL)
 #define DMA_PAGE_CONTINUATION 0xffffffffUL
+
+#define PCI_VENDOR_ATI       0x1002
+#define RADEON_MIN_FB_SIZE   (4UL * 1024UL * 1024UL)
+#define RADEON_MAX_APERTURE  (64UL * 1024UL * 1024UL)
+#define RADEON_CONFIG_MEMSIZE   0x00f8UL
+#define RADEON_CONFIG_APER_SIZE 0x0108UL
+
+static BOOL SupportedRadeon(ULONG device)
+  {
+    return device == 0x5960 || device == 0x5961 || device == 0x5964;
+  }
+
+static ULONG SwapLong(ULONG value)
+  {
+    return ((value & 0x000000ffUL) << 24) |
+           ((value & 0x0000ff00UL) << 8) |
+           ((value & 0x00ff0000UL) >> 8) |
+           ((value & 0xff000000UL) >> 24);
+  }
+
+BOOL InitEarlyRadeonDMAMemory(struct CardBase *cb)
+  {
+    struct Library *PrometheusBase = cb->cb_PrometheusBase;
+    PCIBoard *board = NULL;
+
+    if (cb->cb_DMAArena || !PrometheusBase ||
+        PrometheusBase->lib_Version < 2)
+      return cb->cb_DMAArena != NULL;
+    if (cb->cb_DMAEarlyAttempted)
+      return FALSE;
+    cb->cb_DMAEarlyAttempted = TRUE;
+
+    while ((board = Prm_FindBoardTags(board, PRM_Vendor, PCI_VENDOR_ATI,
+                                      TAG_END)) != NULL)
+      {
+        ULONG device = 0;
+        ULONG framebufferSize = 0;
+        ULONG memorySize;
+        ULONG apertureSize;
+        ULONG usableSize;
+        APTR framebuffer = NULL;
+        APTR mmio = NULL;
+        ULONG mmioSize = 0;
+
+        Prm_GetBoardAttrsTags(board,
+          PRM_Device, (ULONG)&device,
+          PRM_MemoryAddr0, (ULONG)&framebuffer,
+          PRM_MemorySize0, (ULONG)&framebufferSize,
+          PRM_MemoryAddr2, (ULONG)&mmio,
+          PRM_MemorySize2, (ULONG)&mmioSize,
+          TAG_END);
+        if (!SupportedRadeon(device) || !framebuffer || !mmio ||
+            framebufferSize < RADEON_MIN_FB_SIZE + EARLY_DMA_SIZE ||
+            mmioSize < RADEON_CONFIG_APER_SIZE + sizeof(ULONG))
+          continue;
+
+        memorySize = SwapLong(*(volatile ULONG *)
+          ((UBYTE *)mmio + RADEON_CONFIG_MEMSIZE));
+        apertureSize = SwapLong(*(volatile ULONG *)
+          ((UBYTE *)mmio + RADEON_CONFIG_APER_SIZE));
+        usableSize = framebufferSize;
+        if (usableSize > RADEON_MAX_APERTURE) usableSize = RADEON_MAX_APERTURE;
+        if (memorySize >= RADEON_MIN_FB_SIZE + EARLY_DMA_SIZE &&
+            (memorySize & 0x000fffffUL) == 0 && memorySize < usableSize)
+          usableSize = memorySize;
+        if (apertureSize >= RADEON_MIN_FB_SIZE + EARLY_DMA_SIZE &&
+            (apertureSize & (apertureSize - 1UL)) == 0 &&
+            apertureSize < usableSize)
+          usableSize = apertureSize;
+        if (usableSize < RADEON_MIN_FB_SIZE + EARLY_DMA_SIZE)
+          continue;
+
+        if (InitDMAMemory(cb,
+              (APTR)((ULONG)framebuffer + usableSize - EARLY_DMA_SIZE),
+              EARLY_DMA_SIZE, FALSE))
+          {
+            cb->cb_DMAEarly = TRUE;
+            D(kprintf("prometheus.card: early Radeon DMA arena $%08lx size %ld\n",
+                      (LONG)cb->cb_DMAArena->dma_Base,
+                      cb->cb_DMAArena->dma_Size));
+            return TRUE;
+          }
+        return cb->cb_DMAArena != NULL;
+      }
+    D(kprintf("prometheus.card: no supported Radeon for early DMA\n"));
+    return FALSE;
+  }
 
 APTR AllocDMAMemory(__REGD0(ULONG size), __REGA6(struct CardBase *cb))
   {
@@ -22,6 +111,9 @@ APTR AllocDMAMemory(__REGD0(ULONG size), __REGA6(struct CardBase *cb))
 
     if (!size || size > ~0UL - DMA_PAGE_MASK)
       return NULL;
+
+    if (!cb->cb_DMAArena)
+      InitEarlyRadeonDMAMemory(cb);
 
     ObtainSemaphore(cb->cb_MemSem);
     arena = cb->cb_DMAArena;
@@ -190,6 +282,7 @@ VOID FreeDMAMemoryArena(struct CardBase *cb)
         return;
       }
     cb->cb_DMAArena = NULL;
+    cb->cb_DMAEarly = FALSE;
     ReleaseSemaphore(cb->cb_MemSem);
     FreeMem(arena, arena->dma_AllocationSize);
   }

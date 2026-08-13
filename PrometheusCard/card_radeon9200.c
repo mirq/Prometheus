@@ -28,12 +28,28 @@ static BOOL SupportedDevice(ULONG device)
     return device == 0x5960 || device == 0x5961 || device == 0x5964;
   }
 
+static void ClearRadeonBoardInfo(struct BoardInfo *bi)
+  {
+    if (!bi)
+      return;
+    bi->ChipBase = NULL;
+    bi->RegisterBase = NULL;
+    bi->MemoryBase = NULL;
+    bi->MemoryIOBase = NULL;
+    bi->MemorySize = 0;
+    bi->MemorySpaceBase = NULL;
+    bi->MemorySpaceSize = 0;
+    ClearBytes(bi->CardData, sizeof(struct PrometheusRadeonHandoff));
+  }
+
 BOOL InitRadeon9200(struct CardBase *cb, struct BoardInfo *bi)
   {
     struct Library *SysBase = cb->cb_SysBase;
     struct Library *PrometheusBase = cb->cb_PrometheusBase;
     PCIBoard *board = NULL;
     ULONG current = 0;
+
+    ClearRadeonBoardInfo(bi);
 
     while ((board = Prm_FindBoardTags(board, PRM_Vendor, PCI_VENDOR_ATI,
                                       TAG_END)) != NULL)
@@ -93,17 +109,14 @@ BOOL InitRadeon9200(struct CardBase *cb, struct BoardInfo *bi)
         if (!InitChip(bi))
           {
             CloseLibrary((struct Library *)ChipBase);
-            bi->ChipBase = NULL;
-            bi->MemoryBase = NULL;
-            bi->MemoryIOBase = NULL;
-            bi->MemorySize = 0;
-            bi->MemorySpaceBase = NULL;
-            bi->MemorySpaceSize = 0;
+            ClearRadeonBoardInfo(bi);
             continue;
           }
 
         return TRUE;
       }
+    D(kprintf("prometheus.card: no usable Radeon 9200 found\n"));
+    ClearRadeonBoardInfo(bi);
     return FALSE;
   }
 
@@ -123,15 +136,9 @@ void AbortRadeon9200(struct BoardInfo *bi)
     struct ExecBase *SysBase = bi ? bi->ExecBase : NULL;
     struct ChipBase *ChipBase = bi ? bi->ChipBase : NULL;
 
-    if (!SysBase || !ChipBase)
-      return;
-    CloseLibrary((struct Library *)ChipBase);
-    bi->ChipBase = NULL;
-    bi->MemoryBase = NULL;
-    bi->MemoryIOBase = NULL;
-    bi->MemorySize = 0;
-    bi->MemorySpaceBase = NULL;
-    bi->MemorySpaceSize = 0;
+    if (SysBase && ChipBase)
+      CloseLibrary((struct Library *)ChipBase);
+    ClearRadeonBoardInfo(bi);
   }
 
 BOOL InitRadeon9200Features(struct BoardInfo *bi, ULONG features)
