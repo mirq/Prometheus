@@ -1,0 +1,34 @@
+name: Prometheus.card Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    container: stefanreinauer/amiga-gcc:gcc-v6.5.0b-20251124@sha256:11b06254ed512d9a8f65fb13eeb723d5e33cacc1880b80df9f63c29e95fc879a
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify release version
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          test "$version" = "7.602"
+          grep -F 'Prometheus.card 7.602 ' PrometheusCard/vbcc_libinit.c
+
+      - name: Build Prometheus.card
+        run: make clean && make
+        env:
+          CROSS: m68k-amigaos-
+
+      - name: Publish Prometheus.card
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Prometheus.card
+          generate_release_notes: true
