@@ -8,4 +8,7 @@
 BOOL __InitChip(__reg("a6") struct ChipBase *, __reg("a0") struct BoardInfo * bi)="\tjsr\t-30(a6)";
 #define InitChip(bi) __InitChip(ChipBase, (bi))
 
+BOOL __Radeon3DDetachOwner(__reg("a6") struct ChipBase *, __reg("a0") struct BoardInfo * bi)="\tjsr\t-60(a6)";
+#define Radeon3DDetachOwner(bi) __Radeon3DDetachOwner(ChipBase, (bi))
+
 #endif /*  _VBCCINLINE_CHIP_H  */

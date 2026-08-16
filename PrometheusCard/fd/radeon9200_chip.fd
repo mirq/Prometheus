@@ -3,4 +3,8 @@
 ##public
 InitChip(bi)(a0)
 InitRadeonFeatures(bi,features)(a0,d0)
+Radeon3DOpen(requestedVersion,info)(d0,a0)
+Radeon3DClose(device)(a0)
+Radeon3DGetInfo(device,info)(a0,a1)
+Radeon3DDetachOwner(bi)(a0)
 ##end

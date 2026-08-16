@@ -8,13 +8,15 @@
 #include "prometheus_radeon.h"
 
 #define PCI_VENDOR_ATI       0x1002
-#define CHIP_NAME            ((CONST_STRPTR)"picasso96/Radeon9200.chip")
+#ifdef RADEON3D_DEBUG_CHIP
+#define CHIP_NAME ((CONST_STRPTR)"picasso96/Radeon9200-debug.chip")
+#else
+#define CHIP_NAME ((CONST_STRPTR)"picasso96/Radeon9200.chip")
+#endif
 #define RADEON_BAR_FB        0
 #define RADEON_BAR_MMIO      2
 #define RADEON_MIN_FB_SIZE   0x00400000UL
 #define RADEON_MIN_MMIO_SIZE 0x00010000UL
-
-static ULONG count;
 
 static void ClearBytes(APTR memory, ULONG size)
   {
@@ -47,7 +49,6 @@ BOOL InitRadeon9200(struct CardBase *cb, struct BoardInfo *bi)
     struct Library *SysBase = cb->cb_SysBase;
     struct Library *PrometheusBase = cb->cb_PrometheusBase;
     PCIBoard *board = NULL;
-    ULONG current = 0;
 
     ClearRadeonBoardInfo(bi);
 
@@ -80,12 +81,16 @@ BOOL InitRadeon9200(struct CardBase *cb, struct BoardInfo *bi)
             handoff.FramebufferSize < RADEON_MIN_FB_SIZE ||
             handoff.MmioSize < RADEON_MIN_MMIO_SIZE)
           continue;
-        if (current++ < count)
-          continue;
-
         ChipBase = (struct ChipBase *)OpenLibrary(CHIP_NAME, 1);
         if (!ChipBase)
           continue;
+        if (!Prm_SetBoardAttrsTags(board,
+                                   PRM_BoardOwner, (ULONG)ChipBase,
+                                   TAG_END))
+          {
+            CloseLibrary((struct Library *)ChipBase);
+            continue;
+          }
 
         handoff.Magic = PROM_RADEON_HANDOFF_MAGIC;
         handoff.Board = board;
@@ -108,6 +113,9 @@ BOOL InitRadeon9200(struct CardBase *cb, struct BoardInfo *bi)
         bi->MemorySpaceSize = handoff.FramebufferSize;
         if (!InitChip(bi))
           {
+            (void)Prm_SetBoardAttrsTags(board,
+                                        PRM_BoardOwner, 0,
+                                        TAG_END);
             CloseLibrary((struct Library *)ChipBase);
             ClearRadeonBoardInfo(bi);
             continue;
@@ -120,24 +128,24 @@ BOOL InitRadeon9200(struct CardBase *cb, struct BoardInfo *bi)
     return FALSE;
   }
 
-void CompleteRadeon9200(struct CardBase *cb, struct BoardInfo *bi)
-  {
-    struct PrometheusRadeonHandoff *handoff;
-
-    if (!cb || !bi || !bi->ChipBase)
-      return;
-    handoff = (struct PrometheusRadeonHandoff *)bi->CardData;
-    RegisterOwner(cb, handoff->Board, (struct Node *)bi->ChipBase);
-    count++;
-  }
-
-void AbortRadeon9200(struct BoardInfo *bi)
+void AbortRadeon9200(struct CardBase *cb, struct BoardInfo *bi)
   {
     struct ExecBase *SysBase = bi ? bi->ExecBase : NULL;
+    struct Library *PrometheusBase = cb ? cb->cb_PrometheusBase : NULL;
     struct ChipBase *ChipBase = bi ? bi->ChipBase : NULL;
+    struct PrometheusRadeonHandoff *handoff =
+      bi ? (struct PrometheusRadeonHandoff *)bi->CardData : NULL;
 
-    if (SysBase && ChipBase)
+    if (SysBase && ChipBase) {
+      if (ChipBase->LibBase.lib_Version >= 2)
+        (void)Radeon3DDetachOwner(bi);
+      if (PrometheusBase && handoff &&
+          handoff->Magic == PROM_RADEON_HANDOFF_MAGIC && handoff->Board)
+        (void)Prm_SetBoardAttrsTags(handoff->Board,
+                                    PRM_BoardOwner, 0,
+                                    TAG_END);
       CloseLibrary((struct Library *)ChipBase);
+    }
     ClearRadeonBoardInfo(bi);
   }
 

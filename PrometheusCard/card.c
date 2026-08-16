@@ -346,13 +346,14 @@ BOOL InitCard(__REGA0(struct BoardInfo *bi), __REGA1(char **ToolTypes), __REGA6(
           BOOL dma_ready = FALSE;
 
           if (PrometheusBase->lib_Version >= 2 && cb->cb_DMAArena &&
-              cb->cb_DMAEarly && dma_valid &&
-              dma_size == cb->cb_DMAArena->dma_Size &&
-              bi->MemorySize >= dma_size &&
+              cb->cb_DMAEarly && dma_valid && dma_size &&
+              dma_size <= cb->cb_DMAArena->dma_Size &&
+              bi->MemorySize >= cb->cb_DMAArena->dma_Size &&
               (ULONG)cb->cb_DMAArena->dma_Base ==
-                (ULONG)bi->MemoryBase + bi->MemorySize - dma_size)
+                (ULONG)bi->MemoryBase + bi->MemorySize -
+                  cb->cb_DMAArena->dma_Size)
             {
-              bi->MemorySize -= dma_size;
+              bi->MemorySize -= cb->cb_DMAArena->dma_Size;
               cb->cb_DMAEarly = FALSE;
               dma_ready = TRUE;
             }
@@ -373,7 +374,7 @@ BOOL InitCard(__REGA0(struct BoardInfo *bi), __REGA1(char **ToolTypes), __REGA6(
             }
           if (!dma_ready)
             {
-              AbortRadeon9200(bi);
+              AbortRadeon9200(cb, bi);
               return FALSE;
             }
         }
@@ -395,10 +396,9 @@ BOOL InitCard(__REGA0(struct BoardInfo *bi), __REGA1(char **ToolTypes), __REGA6(
           if (!InitRadeon9200Features(bi, features))
             {
               FreeDMAMemoryArena(cb);
-              AbortRadeon9200(bi);
+              AbortRadeon9200(cb, bi);
               return FALSE;
             }
-          CompleteRadeon9200(cb, bi);
         }
     }
     return found;

@@ -13,5 +13,6 @@
 #endif
 
 BOOL	InitChip(struct BoardInfo *bi);
+BOOL	Radeon3DDetachOwner(struct BoardInfo *bi);
 
 #endif	 /* CLIB_PICASSO96_CHIP_PROTOS_H */
