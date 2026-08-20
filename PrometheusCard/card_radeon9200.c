@@ -44,7 +44,8 @@ static void ClearRadeonBoardInfo(struct BoardInfo *bi)
     ClearBytes(bi->CardData, sizeof(struct PrometheusRadeonHandoff));
   }
 
-BOOL InitRadeon9200(struct CardBase *cb, struct BoardInfo *bi)
+BOOL InitRadeon9200(struct CardBase *cb, struct BoardInfo *bi,
+                    UWORD output)
   {
     struct Library *SysBase = cb->cb_SysBase;
     struct Library *PrometheusBase = cb->cb_PrometheusBase;
@@ -94,7 +95,7 @@ BOOL InitRadeon9200(struct CardBase *cb, struct BoardInfo *bi)
 
         handoff.Magic = PROM_RADEON_HANDOFF_MAGIC;
         handoff.Board = board;
-        handoff.Reserved = 0;
+        handoff.Reserved = output & PROM_RADEON_OUTPUT_MASK;
         {
           UBYTE *source = (UBYTE *)&handoff;
           UBYTE *destination = (UBYTE *)bi->CardData;

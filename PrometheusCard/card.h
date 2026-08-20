@@ -62,7 +62,8 @@ BOOL Init3dfxVoodoo(struct CardBase *cb, struct BoardInfo *bi);      // check Ba
 BOOL Init3DLabsPermedia2(struct CardBase *cb, struct BoardInfo *bi); // check Permedia2 based cards (3DLabs/TI)
 BOOL InitCirrusGD5446(struct BoardInfo *bi);    // check GD5446 based Cirrus cards
 BOOL InitS3ViRGE(struct CardBase *cb, struct BoardInfo *bi);         // check ViRGE based S3 cards
-BOOL InitRadeon9200(struct CardBase *cb, struct BoardInfo *bi);
+BOOL InitRadeon9200(struct CardBase *cb, struct BoardInfo *bi,
+                    UWORD output);
 BOOL InitRadeon9200Features(struct BoardInfo *bi, ULONG features);
 void AbortRadeon9200(struct CardBase *cb, struct BoardInfo *bi);
 BOOL InitDMAMemory(struct CardBase *cb, APTR memory, ULONG size,

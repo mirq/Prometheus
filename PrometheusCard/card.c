@@ -9,6 +9,7 @@
 
 #include "boardinfo.h"
 #include "card.h"
+#include "prometheus_radeon.h"
 
 #define HAS_TOOLTYPES (bi->GetVSyncState != NULL)
 #define DMA_PAGE_SIZE 4096UL
@@ -238,6 +239,7 @@ BOOL InitCard(__REGA0(struct BoardInfo *bi), __REGA1(char **ToolTypes), __REGA6(
     BOOL radeon = FALSE;
     ULONG dma_size = 0;
     ULONG legacy_dma_size = 0;
+    UWORD radeon_output = PROM_RADEON_OUTPUT_VGA;
     struct Library* UtilityBase = bi->UtilBase;
 
     /* add dummy handler for safety reasons... */
@@ -282,6 +284,10 @@ BOOL InitCard(__REGA0(struct BoardInfo *bi), __REGA1(char **ToolTypes), __REGA6(
             else if (Stricmp(ToolType, "HWSPRITE=NO") == 0) hw_sprite = FALSE;
             else if (Stricmp(ToolType, "HWTEXT=NO") == 0) hw_text = FALSE;
             else if (Stricmp(ToolType, "TEXTSTAGE=YES") == 0) text_stage = TRUE;
+            else if (Stricmp(ToolType, "OUTPUT=VGA") == 0)
+              radeon_output = PROM_RADEON_OUTPUT_VGA;
+            else if (Stricmp(ToolType, "OUTPUT=DVI") == 0)
+              radeon_output = PROM_RADEON_OUTPUT_DVI;
           }
       }
 
@@ -299,7 +305,7 @@ BOOL InitCard(__REGA0(struct BoardInfo *bi), __REGA1(char **ToolTypes), __REGA6(
 
   if (!found)
     {
-      found = InitRadeon9200(cb, bi);
+      found = InitRadeon9200(cb, bi, radeon_output);
       radeon = found;
     }
 
