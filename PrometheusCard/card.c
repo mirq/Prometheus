@@ -236,6 +236,7 @@ BOOL InitCard(__REGA0(struct BoardInfo *bi), __REGA1(char **ToolTypes), __REGA6(
     BOOL hw_sprite = TRUE;
     BOOL hw_text = TRUE;
     BOOL text_stage = FALSE;
+    BOOL planar_blits = TRUE;
     BOOL radeon = FALSE;
     ULONG dma_size = 0;
     ULONG legacy_dma_size = 0;
@@ -284,6 +285,7 @@ BOOL InitCard(__REGA0(struct BoardInfo *bi), __REGA1(char **ToolTypes), __REGA6(
             else if (Stricmp(ToolType, "HWSPRITE=NO") == 0) hw_sprite = FALSE;
             else if (Stricmp(ToolType, "HWTEXT=NO") == 0) hw_text = FALSE;
             else if (Stricmp(ToolType, "TEXTSTAGE=YES") == 0) text_stage = TRUE;
+            else if (Stricmp(ToolType, "PLANAR=NO") == 0) planar_blits = FALSE;
             else if (Stricmp(ToolType, "OUTPUT=VGA") == 0)
               radeon_output = PROM_RADEON_OUTPUT_VGA;
             else if (Stricmp(ToolType, "OUTPUT=DVI") == 0)
@@ -399,6 +401,7 @@ BOOL InitCard(__REGA0(struct BoardInfo *bi), __REGA1(char **ToolTypes), __REGA6(
           if (hw_sprite) features |= 1UL << 1;
           if (hw_text) features |= 1UL << 2;
           if (text_stage) features |= 1UL << 3;
+          if (planar_blits) features |= 1UL << 5;          /* planar blits */
           if (!InitRadeon9200Features(bi, features))
             {
               FreeDMAMemoryArena(cb);
