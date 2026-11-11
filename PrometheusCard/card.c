@@ -135,6 +135,61 @@ BOOL SetSwitch(__REGA0(struct BoardInfo *bi), __REGD0(BOOL state))
   }
 
 /********************************************************************************************
+* SWITCHTYPE=CSWARP: a Warp7060 drives the video source switch of a WarpedVision A7K. P96   *
+* calls SetSwitch(TRUE) on a board when its screen comes to the front and SetSwitch(FALSE)  *
+* when another board's or a native screen does, so the state is passed on as the Warp's    *
+* AUX request (VID_SRC bit 0, the WarpedVision's HDMI_SW1 line). The SetSwitch it wraps     *
+* still runs first, so this board keeps its output going while another source is shown.    *
+********************************************************************************************/
+
+typedef BOOL (*switchFunc)(__REGA0(struct BoardInfo *bi), __REGD0(BOOL state));
+
+BOOL CSWarpSetSwitch(__REGA0(struct BoardInfo *bi), __REGD0(BOOL state))
+  {
+    volatile ULONG *reg = (volatile ULONG *)bi->CSWarpVidSrcReg;
+    switchFunc old = (switchFunc)bi->CSWarpOldSetSwitch;
+    BOOL oldState = (bi->MoniSwitch & 1) ? TRUE : FALSE;
+
+    if (old)
+      oldState = old(bi, state);
+    else
+      bi->MoniSwitch = (bi->MoniSwitch & ~1) | (state ? 1 : 0);
+    *reg = state ? WARP_VID_SRC_AUX : 0;
+    return oldState;
+  }
+
+/* In the display chain P96 also turns the board's output off while another source is shown. */
+/* WarpedVision does the switching, so keep the link running: a DVI link started up from     */
+/* off just as WarpedVision switches to it was sometimes not picked up (black until # twice). */
+/* DPMS is a separate call and still turns the output off.                                    */
+
+typedef BOOL (*displayFunc)(__REGA0(struct BoardInfo *bi), __REGD0(BOOL state));
+
+BOOL CSWarpSetDisplay(__REGA0(struct BoardInfo *bi), __REGD0(BOOL state))
+  {
+    displayFunc old = (displayFunc)bi->CSWarpOldSetDisplay;
+
+    (void)state;
+    return old ? old(bi, TRUE) : TRUE;
+  }
+
+/* The VID_SRC register of a Warp whose FPGA has the AUX switch output, or NULL. */
+
+static volatile ULONG *FindWarpVidSrc(struct CardBase *cb)
+  {
+    struct Library *ExpansionBase = cb->cb_ExpansionBase;
+    struct ConfigDev *cd;
+    volatile ULONG *reg;
+
+    if (!ExpansionBase) return NULL;
+    cd = FindConfigDev(NULL, WARP_VENDOR, WARP_PRODUCT_CTRL);
+    if (!cd || !cd->cd_BoardAddr) return NULL;
+    reg = (volatile ULONG *)((ULONG)cd->cd_BoardAddr + WARP_VID_SRC_OFFSET);
+    if ((*reg >> 24) != WARP_VID_SRC_CAPID) return NULL;
+    return reg;
+  }
+
+/********************************************************************************************
 * This function sets the DPMS level supplied. Valid values are (see boardinfo.h):           *
 *    DPMS_ON      (normal operation)                                                        *
 *    DPMS_STANDBY (Optional state of minimal power reduction)                               *
@@ -231,6 +286,7 @@ BOOL InitCard(__REGA0(struct BoardInfo *bi), __REGA1(char **ToolTypes), __REGA6(
     BOOL found = FALSE;
     BOOL forbid_interrupts = FALSE;
     BOOL special_switch = FALSE;
+    BOOL cswarp_switch = FALSE;
     BOOL dma_valid = FALSE;
     BOOL cp_enabled = FALSE;
     BOOL hw_sprite = TRUE;
@@ -264,6 +320,14 @@ BOOL InitCard(__REGA0(struct BoardInfo *bi), __REGA1(char **ToolTypes), __REGA6(
                   {
                     special_switch = TRUE;
                   }
+              }
+
+            /* Warp7060 + WarpedVision A7K source switch; the board has its own */
+            /* input on the WarpedVision, so not tied to BIF_INDISPLAYCHAIN    */
+
+            if (Stricmp(ToolType, "SWITCHTYPE=CSWARP") == 0)
+              {
+                cswarp_switch = TRUE;
               }
 
             /* user likes to disable vertical blanking interrupt? */
@@ -407,6 +471,35 @@ BOOL InitCard(__REGA0(struct BoardInfo *bi), __REGA1(char **ToolTypes), __REGA6(
               FreeDMAMemoryArena(cb);
               AbortRadeon9200(cb, bi);
               return FALSE;
+            }
+        }
+
+      /* installed last, so it wraps whatever SetSwitch is in place by now */
+      /* (the chip's, or the JAVOSOFT one); quietly off without the Warp   */
+
+      if (cswarp_switch)
+        {
+          volatile ULONG *reg = FindWarpVidSrc(cb);
+
+          if (reg)
+            {
+              bi->CSWarpOldSetSwitch = (ULONG)bi->SetSwitch;
+              bi->CSWarpVidSrcReg = (ULONG)reg;
+              bi->SetSwitch = CSWarpSetSwitch;
+              *reg = 0;
+
+              /* Through WarpedVision this board shares one display with  */
+              /* the Amiga picture. P96 calls SetSwitch(FALSE) only on     */
+              /* boards in the display chain; the Radeon chip clears the  */
+              /* flag (own monitor), which left the AUX line stuck on.    */
+
+              bi->Flags |= BIF_INDISPLAYCHAIN;
+
+              if (bi->SetDisplay)
+                {
+                  bi->CSWarpOldSetDisplay = (ULONG)bi->SetDisplay;
+                  bi->SetDisplay = CSWarpSetDisplay;
+                }
             }
         }
     }
