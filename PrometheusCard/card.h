@@ -3,6 +3,19 @@
 #define JSetOldDPMSLevel    CardData[14]
 #define JDPMSLevel          CardData[15]
 
+/* SWITCHTYPE=CSWARP: the SetSwitch it wraps, and the address of the Warp's
+ * VID_SRC register ($21C). CardData[0..6] hold the Radeon handoff. */
+#define CSWarpOldSetDisplay CardData[11]
+#define CSWarpOldSetSwitch  CardData[12]
+#define CSWarpVidSrcReg     CardData[13]
+
+/* Warp accelerator video registers (csWarpAmigaSoftware common/WarpDefs.h) */
+#define WARP_VENDOR           0x1400
+#define WARP_PRODUCT_CTRL     101
+#define WARP_VID_SRC_OFFSET   0x21C
+#define WARP_VID_SRC_CAPID    0xA1UL
+#define WARP_VID_SRC_AUX      (1UL << 0)
+
 #define VENDOR_E3B            3643
 #define VENDOR_MATAY          44359
 #define DEVICE_FIRESTORM      200
