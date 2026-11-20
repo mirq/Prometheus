@@ -238,6 +238,8 @@ BOOL InitCard(__REGA0(struct BoardInfo *bi), __REGA1(char **ToolTypes), __REGA6(
     BOOL text_stage = FALSE;
     BOOL planar_blits = TRUE;
     BOOL radeon = FALSE;
+    BOOL geforce = FALSE;
+    char **toolTypesStart = HAS_TOOLTYPES ? ToolTypes : NULL;
     ULONG dma_size = 0;
     ULONG legacy_dma_size = 0;
     UWORD radeon_output = PROM_RADEON_OUTPUT_VGA;
@@ -309,6 +311,14 @@ BOOL InitCard(__REGA0(struct BoardInfo *bi), __REGA1(char **ToolTypes), __REGA6(
     {
       found = InitRadeon9200(cb, bi, radeon_output);
       radeon = found;
+    }
+
+  /* NVIDIA G72 (GeForce 7200 GS); the chip parses its own ToolTypes */
+
+  if (!found)
+    {
+      found = InitGeForce7200(cb, bi, toolTypesStart);
+      geforce = found;
     }
 
   if (found)
@@ -393,6 +403,19 @@ BOOL InitCard(__REGA0(struct BoardInfo *bi), __REGA1(char **ToolTypes), __REGA6(
                 (APTR)((ULONG)bi->MemoryBase + bi->MemorySize -
                        legacy_dma_size), legacy_dma_size, TRUE))
             bi->MemorySize -= legacy_dma_size;
+        }
+      if (geforce)
+        {
+          ULONG features = 0;
+          if (hw_sprite) features |= 1UL << 1;
+          if (hw_text) features |= 1UL << 2;
+          if (planar_blits) features |= 1UL << 5;
+          if (!InitGeForce7200Features(bi, features))
+            {
+              FreeDMAMemoryArena(cb);
+              AbortGeForce7200(cb, bi);
+              return FALSE;
+            }
         }
       if (radeon)
         {

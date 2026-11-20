@@ -31,7 +31,7 @@ LONG LibReserved (void);
 struct CardBase *LibInit (__REGD0(struct CardBase* cb), __REGA0(APTR seglist), __REGA6(struct Library *sysb));
 
 #define VERSION  7
-#define REVISION 602
+#define REVISION 603
 
 int main(void)
 {
@@ -68,7 +68,7 @@ void kprintf(STRPTR format, ...)
 #endif
 
 
-char libid[]   = "\0$VER: Prometheus.card 7.602 " __DBG__ "(12.08.2026)\r\n";
+char libid[]   = "\0$VER: Prometheus.card 7.603 " __DBG__ "(20.11.2026)\r\n";
 char libname[] = "Prometheus.card\0";
 
 char build[]   = "build date: " __DATE__ ", " __TIME__ "\n";

@@ -66,6 +66,10 @@ BOOL InitRadeon9200(struct CardBase *cb, struct BoardInfo *bi,
                     UWORD output);
 BOOL InitRadeon9200Features(struct BoardInfo *bi, ULONG features);
 void AbortRadeon9200(struct CardBase *cb, struct BoardInfo *bi);
+BOOL InitGeForce7200(struct CardBase *cb, struct BoardInfo *bi,
+                     char **toolTypes);
+BOOL InitGeForce7200Features(struct BoardInfo *bi, ULONG features);
+void AbortGeForce7200(struct CardBase *cb, struct BoardInfo *bi);
 BOOL InitDMAMemory(struct CardBase *cb, APTR memory, ULONG size,
                    BOOL legacyFree);
 BOOL InitEarlyRadeonDMAMemory(struct CardBase *cb);

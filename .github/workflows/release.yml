@@ -19,8 +19,8 @@ jobs:
       - name: Verify release version
         run: |
           version=${GITHUB_REF_NAME#v}
-          test "$version" = "7.602"
-          grep -F 'Prometheus.card 7.602 ' PrometheusCard/vbcc_libinit.c
+          test "$version" = "7.603"
+          grep -F 'Prometheus.card 7.603 ' PrometheusCard/vbcc_libinit.c
 
       - name: Build Prometheus.card
         run: make clean && make

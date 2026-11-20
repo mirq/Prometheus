@@ -32,5 +32,8 @@ version 6.503 (17.8.2002)
 
 version 6.504 (19.08.2002)
 - DMA memory list is protected by a semaphore.
- 
 
+7.603 (20.11.2026)
+- NVIDIA GeForce 7200 GS (G72, PCI 10DE:01Dx) probe after the Radeon 9200;
+  hands BAR0/1/3 and the ToolTypes to picasso96/GeForce7200.chip, which
+  repairs the PCI setup and POSTs the card itself. No DMA arena is required.

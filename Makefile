@@ -9,6 +9,7 @@ SOURCES := \
 	$(CARD_DIR)/vbcc_libinit.c \
 	$(CARD_DIR)/dma.c \
 	$(CARD_DIR)/card_radeon9200.c \
+	$(CARD_DIR)/card_geforce7200.c \
 	$(CARD_DIR)/card_s3virge.c \
 	$(CARD_DIR)/card_3dlabspermedia2.c \
 	$(CARD_DIR)/card_3dfxvoodoo.c \
