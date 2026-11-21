@@ -68,6 +68,13 @@ typedef struct
 #include "endian.h"
 #include "lists.h"
 
+/* register parameters: vbcc '__reg("a6") type name', GCC 'type name __asm("a6")' */
+#ifdef __VBCC__
+#define REG(r, decl) __reg(#r) decl
+#else
+#define REG(r, decl) decl __asm(#r)
+#endif
+
 #define FS_PCI_ADDR_CONFIG0    0x1fc00000
 #define FS_PCI_ADDR_CONFIG1    0x1fd00000
 #define FS_PCI_ADDR_IO         0x1fe00000
@@ -206,7 +213,7 @@ struct PciConfig
 #define BLOCK_CFGMEM   4
 
 #define VERSION  4
-#define REVISION 5
+#define REVISION 6
 
 #define CARD_NAME "Picasso96/Prometheus.card"
 
@@ -216,7 +223,7 @@ struct PciConfig
 #define __DBG__
 #endif
 
-char libid[]   = "\0$VER: prometheus.library 4.5 " __DBG__ "(22.01.2024)\r\n";
+char libid[]   = "\0$VER: prometheus.library 4.6 " __DBG__ "(21.11.2026)\r\n";
 char build[]   = "build date: " __DATE__ ", " __TIME__ "\n";
 char libname[] = "prometheus.library\0";
 
@@ -226,28 +233,28 @@ char libname[] = "prometheus.library\0";
 
 /*--- Functions prototypes -------------------------------------------------*/
 
-struct PrometheusBase *LibInit (__reg("d0") struct PrometheusBase *pb, __reg("a0") void *seglist, __reg("a6") struct Library *sysb);
-struct PrometheusBase *LibOpen (__reg("a6") struct PrometheusBase *pb);
-LONG LibClose (__reg("a6") struct PrometheusBase *pb);
-APTR LibExpunge (__reg("a6") struct PrometheusBase *pb);
+struct PrometheusBase *LibInit (REG(d0, struct PrometheusBase *pb), REG(a0, void *seglist), REG(a6, struct Library *sysb));
+struct PrometheusBase *LibOpen (REG(a6, struct PrometheusBase *pb));
+LONG LibClose (REG(a6, struct PrometheusBase *pb));
+APTR LibExpunge (REG(a6, struct PrometheusBase *pb));
 long LibReserved (void);
-PCIBoard* FindBoardTagList (__reg("a6") struct PrometheusBase *pb , __reg("a0") PCIBoard *node, __reg("a1") struct TagItem *taglist);
-ULONG GetBoardAttrsTagList (__reg("a6") struct PrometheusBase *pb, __reg("a0") PCIBoard *board, __reg("a1") struct TagItem *taglist);
-ULONG ReadConfigLong(__reg("a6") struct PrometheusBase *pb, __reg("a0") PCIBoard *board, __reg("d0") UBYTE offset);
-UWORD ReadConfigWord(__reg("a6") struct PrometheusBase *pb, __reg("a0") PCIBoard *board, __reg("d0") UBYTE offset);
-UBYTE ReadConfigByte(__reg("a6") struct PrometheusBase *pb, __reg("a0") PCIBoard *board, __reg("d0") UBYTE offset);
-void WriteConfigLong(__reg("a6") struct PrometheusBase *pb, __reg("a0") PCIBoard *board, __reg("d0") ULONG data, __reg("d1") UBYTE offset);
-void WriteConfigWord(__reg("a6") struct PrometheusBase *pb, __reg("a0") PCIBoard *board, __reg("d0") UWORD data, __reg("d1") UBYTE offset);
-void WriteConfigByte(__reg("a6") struct PrometheusBase *pb, __reg("a0") PCIBoard *board, __reg("d0") UBYTE data, __reg("d1") UBYTE offset);
-LONG SetBoardAttrsTagList(__reg("a6") struct PrometheusBase *pb, __reg("a0") PCIBoard *board, __reg("a1") struct TagItem *taglist);
-BOOL AddIntServer_(__reg("a6") struct PrometheusBase *pb, __reg("a0") PCIBoard *board, __reg("a1") struct Interrupt *intr);
-void RemIntServer_(__reg("a6") struct PrometheusBase *pb, __reg("a0") PCIBoard *board, __reg("a1") struct Interrupt *intr);
-APTR AllocDMABuffer(__reg("a6") struct PrometheusBase *pb, __reg("d0") ULONG size);
-void FreeDMABuffer(__reg("a6") struct PrometheusBase *pb, __reg("a0") APTR buffer, __reg("d0") ULONG size);
-APTR GetPhysicalAddress(__reg("a6") struct PrometheusBase *pb, __reg("d0") APTR addr);
-APTR GetVirtualAddress(__reg("a6") struct PrometheusBase *pb, __reg("d0") APTR addr);
-APTR AllocPCIAddressSpace(__reg("a6") struct PrometheusBase *pb, __reg("a0") PCIBoard *board, __reg("d0") ULONG size, __reg("d1") ULONG bar);
-void FreePCIAddressSpace(__reg("a6") struct PrometheusBase *pb, __reg("a0") PCIBoard *board, __reg("d0") ULONG bar);
+PCIBoard* FindBoardTagList (REG(a6, struct PrometheusBase *pb) , REG(a0, PCIBoard *node), REG(a1, struct TagItem *taglist));
+ULONG GetBoardAttrsTagList (REG(a6, struct PrometheusBase *pb), REG(a0, PCIBoard *board), REG(a1, struct TagItem *taglist));
+ULONG ReadConfigLong(REG(a6, struct PrometheusBase *pb), REG(a0, PCIBoard *board), REG(d0, UBYTE offset));
+UWORD ReadConfigWord(REG(a6, struct PrometheusBase *pb), REG(a0, PCIBoard *board), REG(d0, UBYTE offset));
+UBYTE ReadConfigByte(REG(a6, struct PrometheusBase *pb), REG(a0, PCIBoard *board), REG(d0, UBYTE offset));
+void WriteConfigLong(REG(a6, struct PrometheusBase *pb), REG(a0, PCIBoard *board), REG(d0, ULONG data), REG(d1, UBYTE offset));
+void WriteConfigWord(REG(a6, struct PrometheusBase *pb), REG(a0, PCIBoard *board), REG(d0, UWORD data), REG(d1, UBYTE offset));
+void WriteConfigByte(REG(a6, struct PrometheusBase *pb), REG(a0, PCIBoard *board), REG(d0, UBYTE data), REG(d1, UBYTE offset));
+LONG SetBoardAttrsTagList(REG(a6, struct PrometheusBase *pb), REG(a0, PCIBoard *board), REG(a1, struct TagItem *taglist));
+BOOL AddIntServer_(REG(a6, struct PrometheusBase *pb), REG(a0, PCIBoard *board), REG(a1, struct Interrupt *intr));
+void RemIntServer_(REG(a6, struct PrometheusBase *pb), REG(a0, PCIBoard *board), REG(a1, struct Interrupt *intr));
+APTR AllocDMABuffer(REG(a6, struct PrometheusBase *pb), REG(d0, ULONG size));
+void FreeDMABuffer(REG(a6, struct PrometheusBase *pb), REG(a0, APTR buffer), REG(d0, ULONG size));
+APTR GetPhysicalAddress(REG(a6, struct PrometheusBase *pb), REG(d0, APTR addr));
+APTR GetVirtualAddress(REG(a6, struct PrometheusBase *pb), REG(d0, APTR addr));
+APTR AllocPCIAddressSpace(REG(a6, struct PrometheusBase *pb), REG(a0, PCIBoard *board), REG(d0, ULONG size), REG(d1, ULONG bar));
+void FreePCIAddressSpace(REG(a6, struct PrometheusBase *pb), REG(a0, PCIBoard *board), REG(d0, ULONG bar));
 
 void *FuncTable[] =
  {
@@ -349,15 +356,34 @@ extern struct Library *SysBase;
 #define kprintf printf
 #define CARDDELAY 100000
 #else
-#ifdef DEBUG
+#if defined(DEBUG) && !defined(__VBCC__)
+/* GCC build: kprintf through exec RawDoFmt/RawPutChar (serial) */
+#include <inline/macros.h>
+#define D(x) x
+#define CARDDELAY 100000
+static void DPutChProc(REG(d0, UBYTE c), REG(a3, APTR data))
+{
+  struct ExecBase *SysBase = *(struct ExecBase **)4L;
+  (void)data;
+  LP1NR(0x204, RawPutChar, UBYTE, c, d0, , SysBase);
+}
+void kprintf(const char *format, ...)
+{
+  struct ExecBase *SysBase = *(struct ExecBase **)4L;
+  va_list args;
+  va_start(args, format);
+  RawDoFmt((CONST_STRPTR)format, (APTR)args, (void (*)())DPutChProc, NULL);
+  va_end(args);
+}
+#elif defined(DEBUG)
 #define D(x) x
 #define CARDDELAY 100000
 
-APTR __DRawPutChar(__reg("a6") void *, __reg("d0") UBYTE MyChar)="\tjsr\t-516(a6)";
+APTR __DRawPutChar(REG(a6, void *), REG(d0, UBYTE MyChar))="\tjsr\t-516(a6)";
 
 #define DRawPutChar(MyChar) __DRawPutChar(SysBase, (MyChar))
 
-void DPutChProc(__reg("d0") UBYTE mychar, __reg("a3") APTR PutChData)
+void DPutChProc(REG(d0, UBYTE mychar), REG(a3, APTR PutChData))
 {
     struct ExecBase* SysBase = (struct ExecBase*)PutChData;
     DRawPutChar(mychar);
@@ -741,6 +767,10 @@ void QueryCard (struct PrometheusBase *pb, struct PCIBus *pcibus, volatile struc
             }
             else
             {
+              /* flag bit 1: prefetchable, bit 0: 64-bit BAR (the upper half
+               * is cleared when the address is written) */
+              if (memsize & 0x00000008) flag |= 2;
+              if (((memsize >> 1) & 3) == 2 && basereg < 5) flag |= 1;
               // 3dfx cards have their memory at basereg 1 so map this first for dma access
               if((vendor == VID_3DFX || (vendor == VID_TI && device == DEVID_PERMEDIA2)) && Class == 0x3 && basereg == 1)
 				memtype = BLOCK_GFXMEM;
@@ -762,6 +792,15 @@ void QueryCard (struct PrometheusBase *pb, struct PCIBus *pcibus, volatile struc
             pcinode->pn_TagList[tagindex].ti_Tag = PRM_MemoryAddr0 + basereg;
             CacheClearU();
             AddRequest (pb, pcibus, memsize, memtype, &pcinode->pn_TagList[tagindex++], &conf->types.t0.pc_BaseRegs[basereg], flag);
+            if (memtype != BLOCK_INOUT && (flag & 1) && vendor != VID_FREESCALE)
+            {
+              /* upper half of a 64-bit BAR: not a BAR of its own */
+              basereg++;
+              conf->types.t0.pc_BaseRegs[basereg] = 0;
+              CacheClearU();
+              pcinode->pn_TagList[tagindex++].ti_Tag = PRM_MemorySize0 + basereg;
+              pcinode->pn_TagList[tagindex++].ti_Tag = PRM_MemoryAddr0 + basereg;
+            }
           }
           else
           {
@@ -847,6 +886,191 @@ void QueryCard (struct PrometheusBase *pb, struct PCIBus *pcibus, volatile struc
 }
 
 /*--------------------------------------------------------------------------*/
+/* FireStorm (Firebird) address assignment, 4.6.                            */
+/*                                                                          */
+/* 4.5 handed out memory in request order and stopped the whole loop once   */
+/* the space was used up: with a 256 MB VRAM BAR (aligned to 256 MB) behind */
+/* the bridge, every card on bus 0 (network, sound) was left without any    */
+/* address, I/O included. Now:                                              */
+/*  - I/O and memory are exhausted separately; a request that does not fit  */
+/*    is skipped, the others are still placed;                              */
+/*  - bus 0 memory goes first into holes left by alignment, if the hole is  */
+/*    outside every bridge window;                                          */
+/*  - each bridge gets its own memory, prefetchable and I/O windows from    */
+/*    what was placed behind it (4.5 gave one window over everything);      */
+/*  - 64-bit BARs get their upper half cleared.                             */
+/*--------------------------------------------------------------------------*/
+
+#define FS_MEM_TOP   0x1FC00000UL     /* config/I-O area above */
+#define FS_IO_TOP    0x00200000UL
+#define FS_MAX_HOLES 8
+#define FS_MAX_BUS   8
+
+struct FsWin { ULONG mlo, mhi, plo, phi, ilo, ihi; };   /* [lo, hi) */
+
+static ULONG FsAlign(ULONG a, ULONG size)
+{
+  ULONG m = size - 1;
+  return (a + m) & ~m;
+}
+
+static void FsGrow(ULONG *lo, ULONG *hi, ULONG a, ULONG size)
+{
+  if (*hi <= *lo) { *lo = a; *hi = a + size; return; }
+  if (a < *lo) *lo = a;
+  if (a + size > *hi) *hi = a + size;
+}
+
+/* overlap of [a, a+size) with a 1 MB-rounded window [lo, hi) */
+static BOOL FsHits(ULONG a, ULONG size, ULONG lo, ULONG hi)
+{
+  if (hi <= lo) return FALSE;
+  lo &= 0xFFF00000UL;
+  hi = (hi + 0x000FFFFFUL) & 0xFFF00000UL;
+  return a < hi && a + size > lo;
+}
+
+static void WriteAddressesFS(struct PrometheusBase *pb, struct ConfigDev *cdev)
+{
+  struct Library *SysBase = pb->pb_SysBase;
+  struct SpaceReq *srq;
+  struct PCIBus *pbus;
+  struct { ULONG lo, hi; } holes[FS_MAX_HOLES];
+  struct FsWin win[FS_MAX_BUS];
+  ULONG mem_top = 0, io_top = 0x1000;     /* low I/O left for ISA addresses */
+  ULONG mask = ~(-cdev->cd_BoardSize);
+  int nholes = 0, i, b;
+
+  for (i = 0; i < FS_MAX_BUS; i++)
+    win[i].mlo = win[i].mhi = win[i].plo = win[i].phi = win[i].ilo = win[i].ihi = 0;
+
+  ForeachNode(&pb->pb_Busses, pbus)       /* bus with the graphics card first */
+  {
+    if (pbus->br_hasGraphics == TRUE && (struct PCIBus *)pb->pb_Busses.lh_Head != pbus)
+    {
+      Remove((struct Node *)pbus);
+      AddHead(&pb->pb_Busses, (struct Node *)pbus);
+      break;
+    }
+  }
+
+  ForeachNode(&pb->pb_Busses, pbus)
+  {
+    struct FsWin *w = &win[pbus->br_BusNr < FS_MAX_BUS ? pbus->br_BusNr : 0];
+
+    ForeachNode(&pbus->br_CardRequests, srq)
+    {
+      ULONG size = srq->sr_Size, a;
+      BOOL placed = FALSE;
+
+      if (!size || (size & (size - 1))) continue;
+
+      if (srq->sr_Type == BLOCK_INOUT)
+      {
+        a = FsAlign(io_top, size);
+        if (a + size > FS_IO_TOP)
+        {
+          D(kprintf("[WriteAddressesFS] io size 0x%lx does not fit, skipped\n", size));
+          continue;
+        }
+        *srq->sr_CfgAddr = swapl(a & mask);
+        srq->sr_Tag->ti_Data = (ULONG)cdev->cd_BoardAddr + FS_PCI_ADDR_IO + a;
+        io_top = a + size;
+        if (pbus->br_BusNr > 0) FsGrow(&w->ilo, &w->ihi, a, size);
+        D(kprintf("[WriteAddressesFS] io  0x%08lx size 0x%lx bus %ld\n", a, size, (LONG)pbus->br_BusNr));
+        CacheClearU();
+        continue;
+      }
+
+      /* memory: bus 0 first tries the alignment holes outside all windows */
+      if (pbus->br_BusNr == 0)
+      {
+        for (i = 0; i < nholes && !placed; i++)
+        {
+          BOOL clash = FALSE;
+          a = FsAlign(holes[i].lo, size);
+          if (a < holes[i].lo || a + size > holes[i].hi) continue;
+          for (b = 1; b < FS_MAX_BUS; b++)
+            if (FsHits(a, size, win[b].mlo, win[b].mhi) ||
+                FsHits(a, size, win[b].plo, win[b].phi))
+              clash = TRUE;
+          if (clash) continue;
+          holes[i].lo = a + size;
+          placed = TRUE;
+        }
+      }
+      if (!placed)
+      {
+        a = FsAlign(mem_top, size);
+        /* a prefetchable BAR (graphics memory) may run into the config area
+         * at the top: its user keeps below FS_MEM_TOP (the GeForce driver
+         * uses 252 of 256 MB); nothing else is placed after it */
+        if (a < mem_top || a >= FS_MEM_TOP ||
+            (a + size > FS_MEM_TOP && !(srq->sr_Flag & 2)))
+        {
+          D(kprintf("[WriteAddressesFS] mem size 0x%lx does not fit, skipped\n", size));
+          continue;
+        }
+        if (a > mem_top && nholes < FS_MAX_HOLES)
+        {
+          holes[nholes].lo = mem_top;
+          holes[nholes].hi = a;
+          nholes++;
+        }
+        mem_top = a + size > FS_MEM_TOP ? FS_MEM_TOP : a + size;
+      }
+      *srq->sr_CfgAddr = swapl((a | 1) & mask);
+      srq->sr_Tag->ti_Data = (ULONG)cdev->cd_BoardAddr + a;
+      if (srq->sr_Flag & 1) *(srq->sr_CfgAddr + 1) = 0;   /* 64-bit: upper half */
+      if (pbus->br_BusNr > 0)
+      {
+        ULONG wsize = a + size > FS_MEM_TOP ? FS_MEM_TOP - a : size;
+        if (srq->sr_Flag & 2) FsGrow(&w->plo, &w->phi, a, wsize);
+        else FsGrow(&w->mlo, &w->mhi, a, wsize);
+      }
+      D(kprintf("[WriteAddressesFS] mem 0x%08lx size 0x%lx bus %ld%s\n", a, size,
+                (LONG)pbus->br_BusNr, (srq->sr_Flag & 2) ? " pref" : ""));
+      CacheClearU();
+    }
+  }
+
+  /* bridge windows from what lies behind each bridge */
+  ForeachNode(&pb->pb_Busses, pbus)
+  {
+    struct FsWin *w;
+    volatile UBYTE *cfg;
+
+    if (pbus->br_BusNr == 0 || pbus->br_BusNr >= FS_MAX_BUS || !pbus->br_ConfigBase)
+      continue;
+    w = &win[pbus->br_BusNr];
+    cfg = (volatile UBYTE *)pbus->br_ConfigBase;
+
+    /* 0x1C/0x1D I/O base/limit, 0x30 upper I/O: through the 32-bit registers */
+    if (w->ihi > w->ilo)
+      *(volatile ULONG *)(cfg + 0x1C) = swapl(((w->ilo >> 8) & 0xF0) |
+                                            ((((w->ihi - 1) >> 8) & 0xF0) << 8));
+    else
+      *(volatile ULONG *)(cfg + 0x1C) = swapl(0x000000F0UL);
+    *(volatile ULONG *)(cfg + 0x30) = 0;
+    if (w->mhi > w->mlo)
+      *(volatile ULONG *)(cfg + 0x20) = swapl(((w->mlo >> 16) & 0xFFF0) |
+                                            ((((w->mhi - 1) >> 16) & 0xFFF0) << 16));
+    else
+      *(volatile ULONG *)(cfg + 0x20) = swapl(0x0000FFF0UL);
+    if (w->phi > w->plo)
+      *(volatile ULONG *)(cfg + 0x24) = swapl(((w->plo >> 16) & 0xFFF0) |
+                                            ((((w->phi - 1) >> 16) & 0xFFF0) << 16));
+    else
+      *(volatile ULONG *)(cfg + 0x24) = swapl(0x0000FFF0UL);
+    *(volatile ULONG *)(cfg + 0x28) = 0;
+    *(volatile ULONG *)(cfg + 0x2C) = 0;
+    CacheClearU();
+    D(kprintf("[WriteAddressesFS] bridge bus %ld mem %08lx-%08lx pref %08lx-%08lx io %08lx-%08lx\n",
+              (LONG)pbus->br_BusNr, w->mlo, w->mhi, w->plo, w->phi, w->ilo, w->ihi));
+  }
+}
+
+/*--------------------------------------------------------------------------*/
 /* WriteAddresses() writes base adresses to all base registers (including    */
 /* ROM base registers).                                                     */
 /*--------------------------------------------------------------------------*/
@@ -865,6 +1089,12 @@ void WriteAddresses(struct PrometheusBase *pb, struct ConfigDev *cdev)
   ULONG memlimit, iolimit;
 
   //D(kprintf("WriteAddresses\n"));
+
+  if (pb->pb_FireStorm == TRUE)
+  {
+    WriteAddressesFS(pb, cdev);
+    return;
+  }
 
   if (pb->pb_FireStorm == FALSE)
   {
@@ -1291,7 +1521,7 @@ int main(void)
 /* INIT                                                                    */
 /*-------------------------------------------------------------------------*/
 
-struct PrometheusBase *LibInit(__reg("d0") struct PrometheusBase *pb, __reg("a0") APTR seglist, __reg("a6") struct Library *sysb)
+struct PrometheusBase *LibInit(REG(d0, struct PrometheusBase *pb), REG(a0, APTR seglist), REG(a6, struct Library *sysb))
 {
   struct PrometheusBase *rval = NULL;
   struct ExecBase *SysBase = (struct ExecBase*)sysb;
@@ -1299,6 +1529,7 @@ struct PrometheusBase *LibInit(__reg("d0") struct PrometheusBase *pb, __reg("a0"
   struct ConfigDev *driver = NULL;
   UBYTE cards = 0;
 
+  D(kprintf("[LibInit] pb %08lx seglist %08lx sysbase %08lx\n", (ULONG)pb, (ULONG)seglist, (ULONG)sysb));
   if (!(SysBase->AttnFlags & AFF_68020))
       {
         FreeMem ((APTR)((ULONG)pb - (ULONG)pb->pb_Lib.lib_NegSize),
@@ -1333,6 +1564,7 @@ struct PrometheusBase *LibInit(__reg("d0") struct PrometheusBase *pb, __reg("a0"
           ConfigurePrometheus (pb, driver);
          }
         rval = pb;
+        D(kprintf("[LibInit] done, FireStorm %ld\n", (LONG)pb->pb_FireStorm));
         CloseLibrary (ExpansionBase);
        }
       if (!rval)
@@ -1350,7 +1582,7 @@ struct PrometheusBase *LibInit(__reg("d0") struct PrometheusBase *pb, __reg("a0"
 /* OPEN                                                                    */
 /*-------------------------------------------------------------------------*/
 
-struct PrometheusBase *LibOpen ( __reg("a6") struct PrometheusBase *pb)
+struct PrometheusBase *LibOpen ( REG(a6, struct PrometheusBase *pb))
 {
   struct PrometheusBase *ret = pb;
   
@@ -1363,7 +1595,7 @@ struct PrometheusBase *LibOpen ( __reg("a6") struct PrometheusBase *pb)
 /* CLOSE                                                                   */
 /*-------------------------------------------------------------------------*/
 
-long LibClose ( __reg("a6") struct PrometheusBase *pb)
+LONG LibClose ( REG(a6, struct PrometheusBase *pb))
 {
   if (!(--pb->pb_Lib.lib_OpenCnt))
    {
@@ -1376,7 +1608,7 @@ long LibClose ( __reg("a6") struct PrometheusBase *pb)
 /* EXPUNGE                                                                 */
 /*-------------------------------------------------------------------------*/
 
-void *LibExpunge ( __reg("a6") struct PrometheusBase *pb)
+APTR LibExpunge ( REG(a6, struct PrometheusBase *pb))
 {
   APTR seglist;
   struct Library *SysBase = pb->pb_SysBase;
@@ -1466,7 +1698,7 @@ long LibReserved (void)
 *
 */
 
-PCIBoard *FindBoardTagList ( __reg("a6") struct PrometheusBase *pb, __reg("a0") PCIBoard *node, __reg("a1") struct TagItem *taglist)
+PCIBoard *FindBoardTagList ( REG(a6, struct PrometheusBase *pb), REG(a0, PCIBoard *node), REG(a1, struct TagItem *taglist))
 {
    struct TagItem *tag, *tagbase, *tagptr;
    struct Library *UtilityBase = pb->pb_UtilityBase;
@@ -1593,7 +1825,7 @@ PCIBoard *FindBoardTagList ( __reg("a6") struct PrometheusBase *pb, __reg("a0") 
 *
 */
 
-ULONG GetBoardAttrsTagList ( __reg("a6") struct PrometheusBase *pb, __reg("a0") PCIBoard *board, __reg("a1") struct TagItem *taglist)
+ULONG GetBoardAttrsTagList ( REG(a6, struct PrometheusBase *pb), REG(a0, PCIBoard *board), REG(a1, struct TagItem *taglist))
  {
   struct TagItem *tagptr, *tag, *tagbase;
   struct Library *UtilityBase = pb->pb_UtilityBase;
@@ -1655,7 +1887,7 @@ ULONG GetBoardAttrsTagList ( __reg("a6") struct PrometheusBase *pb, __reg("a0") 
 *
 */
 
-ULONG ReadConfigLong( __reg("a6") struct PrometheusBase *pb, __reg("a0") PCIBoard *board, __reg("d0") UBYTE offset)
+ULONG ReadConfigLong( REG(a6, struct PrometheusBase *pb), REG(a0, PCIBoard *board), REG(d0, UBYTE offset))
 {
     ULONG cfgl = (ULONG)board->pn_ConfigBase;
     struct Library *SysBase = pb->pb_SysBase;
@@ -1709,7 +1941,7 @@ ULONG ReadConfigLong( __reg("a6") struct PrometheusBase *pb, __reg("a0") PCIBoar
 *
 */
 
-UWORD ReadConfigWord( __reg("a6") struct PrometheusBase *pb, __reg("a0") PCIBoard *board, __reg("d0") UBYTE offset)
+UWORD ReadConfigWord( REG(a6, struct PrometheusBase *pb), REG(a0, PCIBoard *board), REG(d0, UBYTE offset))
 {
 
     ULONG cfgw = (ULONG)board->pn_ConfigBase;
@@ -1765,7 +1997,7 @@ UWORD ReadConfigWord( __reg("a6") struct PrometheusBase *pb, __reg("a0") PCIBoar
 *
 */
 
-UBYTE ReadConfigByte( __reg("a6") struct PrometheusBase *pb, __reg("a0") PCIBoard *board, __reg("d0") UBYTE offset)
+UBYTE ReadConfigByte( REG(a6, struct PrometheusBase *pb), REG(a0, PCIBoard *board), REG(d0, UBYTE offset))
 {
     volatile UBYTE *cfgb = (UBYTE*)board->pn_ConfigBase;
     struct Library *SysBase = pb->pb_SysBase;
@@ -1820,7 +2052,7 @@ UBYTE ReadConfigByte( __reg("a6") struct PrometheusBase *pb, __reg("a0") PCIBoar
 *
 */
 
-void WriteConfigLong( __reg("a6") struct PrometheusBase *pb, __reg("a0") PCIBoard *board, __reg("d0") ULONG data, __reg("d1") UBYTE offset)
+void WriteConfigLong( REG(a6, struct PrometheusBase *pb), REG(a0, PCIBoard *board), REG(d0, ULONG data), REG(d1, UBYTE offset))
 {
     ULONG cfgl = (ULONG)board->pn_ConfigBase;
     struct Library *SysBase = pb->pb_SysBase;
@@ -1882,7 +2114,7 @@ void WriteConfigLong( __reg("a6") struct PrometheusBase *pb, __reg("a0") PCIBoar
 *
 */
 
-void WriteConfigWord(__reg("a6") struct PrometheusBase *pb, __reg("a0") PCIBoard *board, __reg("d0") UWORD data, __reg("d1") UBYTE offset)
+void WriteConfigWord(REG(a6, struct PrometheusBase *pb), REG(a0, PCIBoard *board), REG(d0, UWORD data), REG(d1, UBYTE offset))
 {
     ULONG cfgw = (ULONG)board->pn_ConfigBase;
     struct Library *SysBase = pb->pb_SysBase;
@@ -1943,7 +2175,7 @@ void WriteConfigWord(__reg("a6") struct PrometheusBase *pb, __reg("a0") PCIBoard
 *
 */
 
-void WriteConfigByte( __reg("a6") struct PrometheusBase *pb, __reg("a0") PCIBoard *board, __reg("d0") UBYTE data, __reg("d1") UBYTE offset)
+void WriteConfigByte( REG(a6, struct PrometheusBase *pb), REG(a0, PCIBoard *board), REG(d0, UBYTE data), REG(d1, UBYTE offset))
 {
     volatile UBYTE *cfgb = (UBYTE*)board->pn_ConfigBase;
     struct Library *SysBase = pb->pb_SysBase;
@@ -2039,7 +2271,7 @@ void WriteConfigByte( __reg("a6") struct PrometheusBase *pb, __reg("a0") PCIBoar
 
 const LONG SettableTags[] = {PRM_BoardOwner, TAG_END};
 
-LONG SetBoardAttrsTagList ( __reg("a6") struct PrometheusBase *pb, PCIBoard __reg("a0") *board, __reg("a1") struct TagItem *taglist)
+LONG SetBoardAttrsTagList ( REG(a6, struct PrometheusBase *pb), PCIBoard REG(a0, *board), REG(a1, struct TagItem *taglist))
   {
     LONG attr_count = 0;
     struct TagItem *item, *dbasetag, *tagptr = taglist;
@@ -2143,7 +2375,7 @@ LONG SetBoardAttrsTagList ( __reg("a6") struct PrometheusBase *pb, PCIBoard __re
 *
 */
 
-BOOL AddIntServer_( __reg("a6") struct PrometheusBase *pb, __reg("a0") PCIBoard *board, __reg("a1") struct Interrupt *intr)
+BOOL AddIntServer_( REG(a6, struct PrometheusBase *pb), REG(a0, PCIBoard *board), REG(a1, struct Interrupt *intr))
   {
     struct Library *UtilityBase = pb->pb_UtilityBase;
     struct Library *SysBase = pb->pb_SysBase;
@@ -2194,7 +2426,7 @@ BOOL AddIntServer_( __reg("a6") struct PrometheusBase *pb, __reg("a0") PCIBoard 
 *
 */
 
-void RemIntServer_(__reg("a6") struct PrometheusBase *pb, __reg("a0") PCIBoard *board, __reg("a1") struct Interrupt *intr)
+void RemIntServer_(REG(a6, struct PrometheusBase *pb), REG(a0, PCIBoard *board), REG(a1, struct Interrupt *intr))
   {
     struct Library *SysBase = pb->pb_SysBase;
 
@@ -2245,7 +2477,7 @@ void RemIntServer_(__reg("a6") struct PrometheusBase *pb, __reg("a0") PCIBoard *
 *
 */
 
-APTR AllocDMABuffer(__reg("a6") struct PrometheusBase *pb, __reg("d0") ULONG size)
+APTR AllocDMABuffer(REG(a6, struct PrometheusBase *pb), REG(d0, ULONG size))
   {
     struct Library *SysBase = pb->pb_SysBase;
     struct Library *CardBase;
@@ -2301,7 +2533,7 @@ APTR AllocDMABuffer(__reg("a6") struct PrometheusBase *pb, __reg("d0") ULONG siz
 *
 */
 
-void FreeDMABuffer( __reg("a6") struct PrometheusBase *pb, __reg("a0") APTR buffer, __reg("d0") ULONG size)
+void FreeDMABuffer( REG(a6, struct PrometheusBase *pb), REG(a0, APTR buffer), REG(d0, ULONG size))
   {
     struct Library *SysBase = pb->pb_SysBase;
     struct Library *CardBase;
@@ -2358,7 +2590,7 @@ void FreeDMABuffer( __reg("a6") struct PrometheusBase *pb, __reg("a0") APTR buff
 *
 */
 
-APTR GetPhysicalAddress( __reg("a6") struct PrometheusBase *pb, __reg("d0") APTR addr)
+APTR GetPhysicalAddress( REG(a6, struct PrometheusBase *pb), REG(d0, APTR addr))
 {
     D(kprintf("Prm_GetPhysicalAddress 0x%08lx\n", addr));
 	
@@ -2410,7 +2642,7 @@ APTR GetPhysicalAddress( __reg("a6") struct PrometheusBase *pb, __reg("d0") APTR
 *
 */
 
-APTR GetVirtualAddress( __reg("a6") struct PrometheusBase *pb, __reg("d0") APTR addr)
+APTR GetVirtualAddress( REG(a6, struct PrometheusBase *pb), REG(d0, APTR addr))
 {
     D(kprintf("Prm_GetVirtualAddress 0x%08lx\n", addr));
 
@@ -2462,7 +2694,7 @@ APTR GetVirtualAddress( __reg("a6") struct PrometheusBase *pb, __reg("d0") APTR 
 *
 */
 
-APTR AllocPCIAddressSpace( __reg("a6") struct PrometheusBase *pb, __reg("a0") PCIBoard *board, __reg("d0") ULONG size, __reg("d1") ULONG bar)
+APTR AllocPCIAddressSpace( REG(a6, struct PrometheusBase *pb), REG(a0, PCIBoard *board), REG(d0, ULONG size), REG(d1, ULONG bar))
 {
     ULONG memsizeTag, memaddrTag, memLower;
     struct Library *UtilityBase;
@@ -2572,7 +2804,7 @@ APTR AllocPCIAddressSpace( __reg("a6") struct PrometheusBase *pb, __reg("a0") PC
 *
 */
 
-void FreePCIAddressSpace( __reg("a6") struct PrometheusBase *pb, __reg("a0") PCIBoard *board, __reg("d0") ULONG bar)
+void FreePCIAddressSpace( REG(a6, struct PrometheusBase *pb), REG(a0, PCIBoard *board), REG(d0, ULONG bar))
 {
     ULONG memsizeTag, memaddrTag;
     struct Library *UtilityBase;

@@ -114,6 +114,8 @@ APTR AllocDMAMemory(__REGD0(ULONG size), __REGA6(struct CardBase *cb))
 
     if (!cb->cb_DMAArena)
       InitEarlyRadeonDMAMemory(cb);
+    if (!cb->cb_DMAArena)
+      InitEarlyGeForceDMAMemory(cb);
 
     ObtainSemaphore(cb->cb_MemSem);
     arena = cb->cb_DMAArena;

@@ -56,6 +56,7 @@ struct CardBase
     struct SignalSemaphore *cb_MemSem;
     BOOL                    cb_DMAEarly;
     BOOL                    cb_DMAEarlyAttempted;
+    BOOL                    cb_DMAEarlyGeForceAttempted;
   };
 
 BOOL Init3dfxVoodoo(struct CardBase *cb, struct BoardInfo *bi);      // check Banshee/Voodoo3/4/5 based cards
@@ -73,6 +74,7 @@ void AbortGeForce7200(struct CardBase *cb, struct BoardInfo *bi);
 BOOL InitDMAMemory(struct CardBase *cb, APTR memory, ULONG size,
                    BOOL legacyFree);
 BOOL InitEarlyRadeonDMAMemory(struct CardBase *cb);
+BOOL InitEarlyGeForceDMAMemory(struct CardBase *cb);
 VOID FreeDMAMemoryArena(struct CardBase *cb);
 
 void RegisterIntServer(struct CardBase *cb, void *board, struct Interrupt *interrupt);

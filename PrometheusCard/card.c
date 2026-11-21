@@ -396,6 +396,19 @@ BOOL InitCard(__REGA0(struct BoardInfo *bi), __REGA1(char **ToolTypes), __REGA6(
               return FALSE;
             }
         }
+      else if (geforce && cb->cb_DMAArena)
+        {
+          /* arena made before the monitor was loaded (AllocDMAMemory from
+           * an earlier driver): keep it, Picasso96 ends below it */
+          ULONG base = (ULONG)bi->MemoryBase;
+          ULONG arena = (ULONG)cb->cb_DMAArena->dma_Base;
+
+          if (arena >= base && arena < base + bi->MemorySize)
+            bi->MemorySize = arena - base;
+          cb->cb_DMAEarly = FALSE;
+          D(kprintf("prometheus.card: GeForce keeps DMA arena $%08lx\n",
+                    (LONG)arena));
+        }
       else if (PrometheusBase->lib_Version >= 2 && !cb->cb_DMAArena)
         {
           if (legacy_dma_size <= bi->MemorySize &&

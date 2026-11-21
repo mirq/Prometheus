@@ -48,6 +48,86 @@ static void ClearGeForceBoardInfo(struct BoardInfo *bi)
     ClearBytes(bi->CardData, sizeof(struct PrometheusGeForceHandoff));
   }
 
+/* Fill the handoff for a supported G72 board; FALSE when it is not one */
+static BOOL GeForceHandoff(struct Library *PrometheusBase, PCIBoard *board,
+                           struct PrometheusGeForceHandoff *handoff)
+  {
+    ULONG device = 0, cls = 0;
+
+    ClearBytes(handoff, sizeof(*handoff));
+    Prm_GetBoardAttrsTags(board,
+      PRM_Device, (ULONG)&device,
+      PRM_Class, (ULONG)&cls,
+      PRM_MemoryAddr0 + GEFORCE_BAR_MMIO, (ULONG)&handoff->RegisterBase,
+      PRM_MemorySize0 + GEFORCE_BAR_MMIO, (ULONG)&handoff->RegisterSize,
+      PRM_MemoryAddr0 + GEFORCE_BAR_FB, (ULONG)&handoff->FramebufferBase,
+      PRM_MemorySize0 + GEFORCE_BAR_FB, (ULONG)&handoff->FramebufferSize,
+      PRM_MemoryAddr0 + GEFORCE_BAR_RAMIN, (ULONG)&handoff->RaminBase,
+      PRM_MemorySize0 + GEFORCE_BAR_RAMIN, (ULONG)&handoff->RaminSize,
+      TAG_END);
+    if (cls != 3 || !SupportedDevice(device) || !handoff->RegisterBase ||
+        !handoff->FramebufferBase ||
+        handoff->RegisterSize < GEFORCE_MIN_MMIO_SIZE ||
+        handoff->FramebufferSize < GEFORCE_MIN_FB_SIZE)
+      return FALSE;
+    handoff->Magic = PROM_GEFORCE_HANDOFF_MAGIC;
+    handoff->Version = PROM_GEFORCE_HANDOFF_VERSION;
+    handoff->DeviceId = (UWORD)device;
+    handoff->Board = board;
+    return TRUE;
+  }
+
+/*
+ * Early DMA arena (AllocDMAMemory before the monitor is loaded, e.g. AHI or
+ * USB drivers mounted earlier in the startup): GeForce7200.chip repairs the
+ * bus and POSTs the card (LVO -42), the arena goes at the top of the VRAM
+ * the chip will later give Picasso96. InitCard keeps it there.
+ */
+BOOL InitEarlyGeForceDMAMemory(struct CardBase *cb)
+  {
+    struct Library *SysBase = cb->cb_SysBase;
+    struct Library *PrometheusBase = cb->cb_PrometheusBase;
+    PCIBoard *board = NULL;
+
+    if (cb->cb_DMAArena || !PrometheusBase || PrometheusBase->lib_Version < 2)
+      return cb->cb_DMAArena != NULL;
+    if (cb->cb_DMAEarlyGeForceAttempted)
+      return FALSE;
+    cb->cb_DMAEarlyGeForceAttempted = TRUE;
+
+    while ((board = Prm_FindBoardTags(board, PRM_Vendor, PCI_VENDOR_NVIDIA,
+                                      TAG_END)) != NULL)
+      {
+        struct PrometheusGeForceHandoff handoff;
+        struct Library *ChipBase;
+        ULONG usable;
+
+        if (!GeForceHandoff(PrometheusBase, board, &handoff))
+          continue;
+        ChipBase = OpenLibrary(CHIP_NAME, 1);
+        if (!ChipBase)
+          return FALSE;
+        usable = ChipBase->lib_Version >= 1 && ChipBase->lib_NegSize >= 42 ?
+          LP1(0x2a, ULONG, G72EarlyInit,
+              struct PrometheusGeForceHandoff *, &handoff, a0, , ChipBase) : 0;
+        CloseLibrary(ChipBase);
+        if (usable < GEFORCE_MIN_FB_SIZE + EARLY_DMA_SIZE ||
+            usable > handoff.FramebufferSize)
+          return FALSE;
+        if (InitDMAMemory(cb,
+              (APTR)((ULONG)handoff.FramebufferBase + usable - EARLY_DMA_SIZE),
+              EARLY_DMA_SIZE, FALSE))
+          {
+            cb->cb_DMAEarly = TRUE;
+            D(kprintf("prometheus.card: early GeForce DMA arena $%08lx\n",
+                      (LONG)cb->cb_DMAArena->dma_Base));
+            return TRUE;
+          }
+        return FALSE;
+      }
+    return FALSE;
+  }
+
 BOOL InitGeForce7200(struct CardBase *cb, struct BoardInfo *bi,
                      char **toolTypes)
   {
@@ -62,24 +142,8 @@ BOOL InitGeForce7200(struct CardBase *cb, struct BoardInfo *bi,
       {
         struct PrometheusGeForceHandoff handoff;
         struct ChipBase *ChipBase;
-        ULONG device = 0, cls = 0;
 
-        ClearBytes(&handoff, sizeof(handoff));
-        Prm_GetBoardAttrsTags(board,
-          PRM_Device, (ULONG)&device,
-          PRM_Class, (ULONG)&cls,
-          PRM_MemoryAddr0 + GEFORCE_BAR_MMIO, (ULONG)&handoff.RegisterBase,
-          PRM_MemorySize0 + GEFORCE_BAR_MMIO, (ULONG)&handoff.RegisterSize,
-          PRM_MemoryAddr0 + GEFORCE_BAR_FB, (ULONG)&handoff.FramebufferBase,
-          PRM_MemorySize0 + GEFORCE_BAR_FB, (ULONG)&handoff.FramebufferSize,
-          PRM_MemoryAddr0 + GEFORCE_BAR_RAMIN, (ULONG)&handoff.RaminBase,
-          PRM_MemorySize0 + GEFORCE_BAR_RAMIN, (ULONG)&handoff.RaminSize,
-          TAG_END);
-
-        if (cls != 3 || !SupportedDevice(device) || !handoff.RegisterBase ||
-            !handoff.FramebufferBase ||
-            handoff.RegisterSize < GEFORCE_MIN_MMIO_SIZE ||
-            handoff.FramebufferSize < GEFORCE_MIN_FB_SIZE)
+        if (!GeForceHandoff(PrometheusBase, board, &handoff))
           continue;
         ChipBase = (struct ChipBase *)OpenLibrary(CHIP_NAME, 1);
         if (!ChipBase)
@@ -92,10 +156,6 @@ BOOL InitGeForce7200(struct CardBase *cb, struct BoardInfo *bi,
             continue;
           }
 
-        handoff.Magic = PROM_GEFORCE_HANDOFF_MAGIC;
-        handoff.Version = PROM_GEFORCE_HANDOFF_VERSION;
-        handoff.DeviceId = (UWORD)device;
-        handoff.Board = board;
         handoff.ToolTypes = toolTypes;
         {
           UBYTE *source = (UBYTE *)&handoff;
